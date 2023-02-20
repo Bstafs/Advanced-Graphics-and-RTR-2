@@ -846,13 +846,12 @@ void Render()
 	// Hull Shader Stage
 	g_pImmediateContext->HSSetShader(g_pHullShader, nullptr, 0);
 
-	// Tessellation 
+	// Tessellation (Hidden)
 
 	// Domain Shader Stage
 	g_pImmediateContext->DSSetShader(g_pDomainShader, nullptr, 0);
 	g_pImmediateContext->DSSetConstantBuffers(0, 1, &g_pConstantBuffer);
-	g_pImmediateContext->DSSetConstantBuffers(1, 1, &materialCB);
-	g_pImmediateContext->DSSetConstantBuffers(2, 1, &g_pLightConstantBuffer);
+
 	// Geometry Shader
 
 	// Pixel Shader Stage
