@@ -76,6 +76,8 @@ cbuffer LightProperties : register(b2)
 }; 
 
 //--------------------------------------------------------------------------------------
+
+// Vertex Shader
 struct VS_INPUT
 {
     float4 Pos : POSITION;
@@ -83,6 +85,16 @@ struct VS_INPUT
 	float2 Tex : TEXCOORD0;
 };
 
+// Hull Shader
+struct HS_INPUT
+{
+	float4 Pos : SV_POSITION;
+	float4 worldPos : POSITION;
+	float3 Norm : NORMAL;
+	float2 Tex : TEXCOORD0;
+};
+
+// Pixel Shader
 struct PS_INPUT
 {
     float4 Pos : SV_POSITION;
@@ -91,6 +103,11 @@ struct PS_INPUT
 	float2 Tex : TEXCOORD0;
 };
 
+struct HS_CONSTANT_DATA_OUTPUT
+{
+	float Edges[3] : SV_TessFactor;
+	float Inside : SV_InsideTessFactor;
+};
 
 float4 DoDiffuse(Light light, float3 L, float3 N)
 {
@@ -179,20 +196,72 @@ LightingResult ComputeLighting(float4 vertexPos, float3 N)
 PS_INPUT VS( VS_INPUT input )
 {
     PS_INPUT output = (PS_INPUT)0;
-    output.Pos = mul( input.Pos, World );
-	output.worldPos = output.Pos;
-    output.Pos = mul( output.Pos, View );
-    output.Pos = mul( output.Pos, Projection );
 
-	// multiply the normal by the world transform (to go from model space to world space)
+ //   output.Pos = mul( input.Pos, World );
+ //   output.worldPos = output.Pos;
+ //   output.Pos = mul( output.Pos, View );
+ //   output.Pos = mul( output.Pos, Projection );
+
+	output.Pos = input.Pos;
 	output.Norm = mul(float4(input.Norm, 0), World).xyz;
-
 	output.Tex = input.Tex;
     
     return output;
 }
+//--------------------------------------------------------------------------------------
+// Hull Shader Control Point Phase
+//--------------------------------------------------------------------------------------
+[domain("tri")]
+[partitioning("fractional_even")]
+[outputtopology("triangle_cw")]
+[outputcontrolpoints(3)]
+[patchconstantfunc("PassThroughConstantHS")]
+[maxtessfactor(16.0)]
+HS_INPUT HSMAIN(InputPatch<HS_INPUT, 3> ip, uint i : SV_OutputControlPointID, uint PatchID : SV_PrimitiveID)
+{
+	HS_INPUT output;
+	output.Pos = ip[i].Pos;
+	output.worldPos = ip[i].worldPos;
+	output.Norm = ip[i].Norm;
+	output.Tex = ip[i].Tex;
+	return output;
+}
+//--------------------------------------------------------------------------------------
+// Hull Shader Patch Constant Phase
+//--------------------------------------------------------------------------------------
+HS_CONSTANT_DATA_OUTPUT PassThroughConstantHS(InputPatch<HS_INPUT, 3> ip, uint PatchID : SV_PrimitiveID)
+{
+	float tessellationFactor = 16.0f;
+	HS_CONSTANT_DATA_OUTPUT output;
+	output.Edges[0] = tessellationFactor;
+	output.Edges[1] = tessellationFactor;
+	output.Edges[2] = tessellationFactor;
+	output.Inside = tessellationFactor;
+	return output;
+}
+//--------------------------------------------------------------------------------------
+// Domain Shader
+//--------------------------------------------------------------------------------------
+[domain("tri")]
+PS_INPUT DSMAIN(HS_CONSTANT_DATA_OUTPUT input, float3 barycentrucCoords : SV_DomainLocation, const OutputPatch<HS_INPUT, 3> trianglePatch)
+{
+	PS_INPUT output;
+	float3 worldPos = barycentrucCoords.x * trianglePatch[0].Pos + barycentrucCoords.y * trianglePatch[1].Pos + barycentrucCoords.z * trianglePatch[2].Pos;
+
+	output.Pos = float4(worldPos.xyz, 1.0f);
+
+	output.Tex = barycentrucCoords.x * trianglePatch[0].Tex + barycentrucCoords.y * trianglePatch[1].Tex + barycentrucCoords.z * trianglePatch[2].Tex;
 
 
+	output.Norm = barycentrucCoords.x * trianglePatch[0].Norm + barycentrucCoords.y * trianglePatch[1].Norm + barycentrucCoords.z * trianglePatch[2].Norm;
+
+	output.Pos = mul(output.Pos, World);
+	output.worldPos = output.Pos;
+	output.Pos = mul(output.Pos, View);
+	output.Pos = mul(output.Pos, Projection);
+
+	return output;
+}
 //--------------------------------------------------------------------------------------
 // Pixel Shader
 //--------------------------------------------------------------------------------------
