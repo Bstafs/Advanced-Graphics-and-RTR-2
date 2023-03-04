@@ -17,7 +17,7 @@
 #include "main.h"
 
 DirectX::XMFLOAT4 g_EyePosition(0.0f, 0, -3, 1.0f);
-
+XMFLOAT4 LightPosition(g_EyePosition);
 //--------------------------------------------------------------------------------------
 // Forward declarations
 //--------------------------------------------------------------------------------------
@@ -30,7 +30,8 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 void		Render();
 void KeyboardInput();
 void ImGuiRender();
-void UpdateCamera();
+void Update();
+HRESULT CreateTerrain(int width, int height, string filename);
 
 
 //--------------------------------------------------------------------------------------
@@ -64,6 +65,13 @@ ID3D11Buffer* g_pConstantBuffer = nullptr;
 ID3D11Buffer* g_pLightConstantBuffer = nullptr;
 
 ID3D11RasterizerState* g_pWireFrame;
+ID3D11SamplerState* g_pSamplerState = nullptr;
+
+ID3D11Buffer* g_pGridVertexBuffer = nullptr;
+ID3D11Buffer* g_pGridIndexBuffer = nullptr;
+
+ID3D11Buffer* g_pTerrainMaterialBuffer = nullptr;
+MaterialPropertiesConstantBuffer	m_material;
 
 // Camera
 XMMATRIX                g_View;
@@ -79,10 +87,32 @@ float rotationY = 0.0f;
 int						g_viewWidth;
 int						g_viewHeight;
 
-bool isWireFrame = true;
+bool isWireFrame = false;
 
 DrawableGameObject		g_GameObject;
 
+// Terrain
+UINT rows;
+UINT columns;
+int totalCells;
+UINT totalFaces;
+int totalVertices;
+int depth;
+int width;
+// Width & Depth
+float dx;
+float dz;
+//Texture Coords
+float du;
+float dv;
+
+// Terrain Object
+XMFLOAT4X4 g_Terrian;
+
+// Terrain Textures
+ID3D11ShaderResourceView* g_pTextureGrass = nullptr;
+ID3D11ShaderResourceView* g_pTextureStone = nullptr;
+ID3D11ShaderResourceView* g_pTextureSnow = nullptr;
 
 //--------------------------------------------------------------------------------------
 // Entry point to the program. Initializes everything and goes into a message processing 
@@ -113,7 +143,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 		}
 		else
 		{
-			UpdateCamera();
+			Update();
 			KeyboardInput();
 			Render();
 		}
@@ -391,6 +421,36 @@ HRESULT InitDevice()
 	rs.CullMode = D3D11_CULL_NONE;
 	hr = g_pd3dDevice->CreateRasterizerState(&rs, &g_pWireFrame);
 
+	D3D11_SAMPLER_DESC sampDesc;
+	ZeroMemory(&sampDesc, sizeof(sampDesc));
+	sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+	sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+	sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+	sampDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+	sampDesc.MinLOD = 0;
+	sampDesc.MaxLOD = D3D11_FLOAT32_MAX;
+	g_pd3dDevice->CreateSamplerState(&sampDesc, &g_pSamplerState);
+
+	m_material.Material.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	m_material.Material.Specular = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	m_material.Material.SpecularPower = 32.0f;
+	m_material.Material.UseTexture = true;
+
+	// Create the material constant buffer
+	D3D11_BUFFER_DESC bd = {};
+	bd.Usage = D3D11_USAGE_DEFAULT;
+	bd.ByteWidth = sizeof(MaterialPropertiesConstantBuffer);
+	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	bd.CPUAccessFlags = 0;
+	hr = g_pd3dDevice->CreateBuffer(&bd, nullptr, &g_pTerrainMaterialBuffer);
+	if (FAILED(hr))
+		return hr;
+
+	hr = CreateDDSTextureFromFile(g_pd3dDevice, L"grass.dds", nullptr, &g_pTextureGrass);
+	hr = CreateDDSTextureFromFile(g_pd3dDevice, L"stone.dds", nullptr, &g_pTextureStone);
+	hr = CreateDDSTextureFromFile(g_pd3dDevice, L"snow.dds", nullptr, &g_pTextureSnow);
+
 	hr = InitMesh();
 	if (FAILED(hr))
 	{
@@ -562,6 +622,8 @@ HRESULT		InitWorld(int width, int height)
 	g_pCurrentCamera->SetView();
 	g_pCurrentCamera->SetProjection();
 
+	CreateTerrain(100, 100, "terrain2.raw");
+
 	return S_OK;
 }
 
@@ -655,6 +717,136 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
+
+
+HRESULT CreateTerrain(int width, int height, string filename)
+{
+	HRESULT hr;
+
+	// Height Map Loading
+	XMFLOAT3* heightMap;
+
+	int heightMapWidth = 512;
+	int heightMapHeight = 512;
+	int heightScale = 10;
+
+	vector<unsigned char> in(heightMapWidth * heightMapHeight);
+
+	std::ifstream inFile;
+	inFile.open(filename.c_str(), std::ios_base::binary);
+
+	if(inFile)
+	{
+		inFile.read((char*)&in[0], (std::streamsize)in.size());
+
+		inFile.close();
+	}
+
+	heightMap = new XMFLOAT3[heightMapHeight * heightMapWidth];
+
+	for(UINT i =0; i < heightMapHeight * heightMapWidth; ++i)
+	{
+		heightMap[i].x = (in[i] / 255.0f) * heightScale;
+		heightMap[i].y = (in[i] / 255.0f) * heightScale;
+		heightMap[i].z = (in[i] / 255.0f) * heightScale;
+	}
+
+	// Grid Generation
+	rows = width;
+	columns = height;
+
+	depth = height;
+
+	float halfDepth = 0.5f * depth;
+	float halfWidth = 0.5f * width;
+
+	rows = rows - 1;
+	columns = columns - 1;
+	totalCells = (rows - 1) * (columns - 1);
+	totalFaces = (rows - 1) * (columns - 1) * 2 * 6;
+	totalVertices = rows * columns;
+
+	dx = width / (columns - 1);
+	dz = depth / (rows - 1);
+
+	du = 1.0f / (columns - 1);
+	dv = 1.0f / (rows - 1);
+
+	std::vector<SimpleVertex> v(totalVertices);
+
+	// Vertex Generation
+	for (UINT i = 0; i < rows; ++i)
+	{
+		float z = halfDepth - i * dz;
+		for (UINT j = 0; j < columns; ++j)
+		{
+			float x = -halfWidth + j * dx;
+			float y = heightMap[j + i * rows].y;
+			v[i * columns + j].Pos = XMFLOAT3(x,y,z);
+			v[i * columns + j].Normal = XMFLOAT3(0.0f, 1.0f, 0.0f);
+
+			v[i * columns + j].TexCoord.x = j * du;
+			v[i * columns + j].TexCoord.y = i * dv;
+		}
+	}
+
+	std::vector<WORD> indices(totalFaces * 3);
+
+	int k = 0;
+	// Index Generation
+	for (UINT i = 0; i < rows - 1; ++i)
+	{
+		for (UINT j = 0; j < columns - 1; ++j)
+		{
+			indices[k] = i * columns + j;
+			indices[k + 1] = i * columns + j + 1;
+			indices[k + 2] = (i + 1) * columns + j;
+			indices[k + 3] = (i + 1) * columns + j;
+			indices[k + 4] = i * columns + j + 1;
+			indices[k + 5] = (i + 1) * columns + j + 1;
+
+			k += 6;
+		}
+	}
+
+	// Vertex Buffer
+	D3D11_BUFFER_DESC bd;
+	ZeroMemory(&bd, sizeof(bd));
+	bd.Usage = D3D11_USAGE_IMMUTABLE;
+	bd.ByteWidth = sizeof(SimpleVertex) * v.size();
+	bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	bd.CPUAccessFlags = 0;
+
+	D3D11_SUBRESOURCE_DATA InitData;
+	ZeroMemory(&InitData, sizeof(InitData));
+	InitData.pSysMem = &v[0];
+	hr = g_pd3dDevice->CreateBuffer(&bd, &InitData, &g_pGridVertexBuffer);
+
+	if (FAILED(hr))
+		return hr;
+
+	// Index Buffer
+	D3D11_BUFFER_DESC bd2;
+	ZeroMemory(&bd2, sizeof(bd2));
+
+	bd2.Usage = D3D11_USAGE_DEFAULT;
+	bd2.ByteWidth = sizeof(WORD) * indices.size();
+	bd2.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	bd2.CPUAccessFlags = 0;
+
+	D3D11_SUBRESOURCE_DATA InitData2;
+	ZeroMemory(&InitData2, sizeof(InitData2));
+	InitData2.pSysMem = &indices[0];
+	hr = g_pd3dDevice->CreateBuffer(&bd2, &InitData2, &g_pGridIndexBuffer);
+
+	if (FAILED(hr))
+		return hr;
+
+
+	return hr;
+}
+
+
 void setupLightForRender()
 {
 	Light light;
@@ -668,12 +860,11 @@ void setupLightForRender()
 
 
 	// set up the light
-	XMFLOAT4 LightPosition(g_EyePosition);
 	light.Position = LightPosition;
 	XMVECTOR LightDirection = XMVectorSet(-LightPosition.x, -LightPosition.y, -LightPosition.z, 0.0f);
 	LightDirection = XMVector3Normalize(LightDirection);
 	XMStoreFloat4(&light.Direction, LightDirection);
-
+	
 
 	LightPropertiesConstantBuffer lightProperties;
 	lightProperties.EyePosition = LightPosition;
@@ -681,7 +872,7 @@ void setupLightForRender()
 	g_pImmediateContext->UpdateSubresource(g_pLightConstantBuffer, 0, nullptr, &lightProperties, 0, 0);
 }
 
-void UpdateCamera()
+void Update()
 {
 	g_pCurrentCamera->SetPosition(XMFLOAT3(currentPosX - sin(rotationX), currentPosY - sin(rotationY), currentPosZ - cos(rotationX)));
 	g_pCurrentCamera->SetLookAt(XMFLOAT3(currentPosX, currentPosY, currentPosZ));
@@ -689,6 +880,8 @@ void UpdateCamera()
 
 	g_pCurrentCamera->SetView();
 	g_pCurrentCamera->SetProjection();
+
+	XMStoreFloat4x4(&g_Terrian, XMMatrixTranslation(0.0f, -15.0f, 0.0f));
 }
 
 void KeyboardInput()
@@ -800,6 +993,13 @@ void ImGuiRender()
 		ImGui::DragFloat("Rotate on the X Axis", &rotationX, 0.05f);
 		ImGui::DragFloat("Rotate on the Y Axis", &rotationY, 0.05f);
 	}
+	if (ImGui::CollapsingHeader("Light"))
+	{
+		ImGui::Text("Light Position");
+		ImGui::DragFloat("Light Pos X", &LightPosition.x, 0.05f);
+		ImGui::DragFloat("Light Pos Y", &LightPosition.y, 0.05f);
+		ImGui::DragFloat("Light Pos Z", &LightPosition.z, 0.05f);
+	}
 	if (ImGui::CollapsingHeader("Util"))
 	{
 		ImGui::Checkbox("Wire Frame Mode", &isWireFrame);
@@ -823,24 +1023,28 @@ void Render()
 	g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, Colors::MidnightBlue);
 	g_pImmediateContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
-	g_GameObject.update(t, g_pImmediateContext);
-
-	XMMATRIX mGO = XMLoadFloat4x4(g_GameObject.getTransform());
+	UINT stride = sizeof(SimpleVertex);
+	UINT offset = 0;
 
 	ConstantBuffer cb1;
-	cb1.mWorld = XMMatrixTranspose(mGO);
+	XMMATRIX myTerrain = XMLoadFloat4x4(&g_Terrian);
+	cb1.mWorld = XMMatrixTranspose(myTerrain);
 	cb1.mView = XMMatrixTranspose(XMLoadFloat4x4(g_pCurrentCamera->GetView()));
 	cb1.mProjection = XMMatrixTranspose(XMLoadFloat4x4(g_pCurrentCamera->GetProjection()));
 	cb1.vOutputColor = XMFLOAT4(1, 1, 1, 0);
+
 	g_pImmediateContext->UpdateSubresource(g_pConstantBuffer, 0, nullptr, &cb1, 0, 0);
+	g_pImmediateContext->UpdateSubresource(g_pTerrainMaterialBuffer, 0, nullptr, &m_material, 0, 0);
 
 	setupLightForRender();
+
+	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pGridVertexBuffer, &stride, &offset);
+	g_pImmediateContext->IASetIndexBuffer(g_pGridIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
 
 	// Vertex Shader Stage
 	g_pImmediateContext->VSSetShader(g_pVertexShader, nullptr, 0);
 	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pConstantBuffer);
-	ID3D11Buffer* materialCB = g_GameObject.getMaterialConstantBuffer();
-	g_pImmediateContext->VSSetConstantBuffers(1, 1, &materialCB);
+	g_pImmediateContext->VSSetConstantBuffers(1, 1, &g_pTerrainMaterialBuffer);
 	g_pImmediateContext->VSSetConstantBuffers(2, 1, &g_pLightConstantBuffer);
 
 	// Hull Shader Stage
@@ -856,11 +1060,17 @@ void Render()
 
 	// Pixel Shader Stage
 	g_pImmediateContext->PSSetShader(g_pPixelShader, nullptr, 0);
-	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pConstantBuffer);
-	g_pImmediateContext->PSSetConstantBuffers(1, 1, &materialCB);
+	g_pImmediateContext->PSSetConstantBuffers(1, 1, &g_pTerrainMaterialBuffer);
 	g_pImmediateContext->PSSetConstantBuffers(2, 1, &g_pLightConstantBuffer);
 
-	g_GameObject.draw(g_pImmediateContext);
+	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureGrass);
+	g_pImmediateContext->PSSetShaderResources(1, 1, &g_pTextureStone);
+	g_pImmediateContext->PSSetShaderResources(2, 1, &g_pTextureSnow);
+	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerState);
+
+	g_pImmediateContext->DrawIndexed(totalFaces, 0, 0);
+
+	g_pImmediateContext->Flush();
 
 	ImGuiRender();
 

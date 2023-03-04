@@ -10,6 +10,7 @@
 #include "DDSTextureLoader.h"
 #include "resource.h"
 #include <iostream>
+#include  <fstream>
 
 #include "DrawableGameObject.h"
 #include "structures.h"
@@ -21,6 +22,8 @@
 #include "ImGui/imgui_impl_dx11.h"
 
 #include "Camera.h"
+
+#include "Terrain.h"
 
 using namespace std;
 

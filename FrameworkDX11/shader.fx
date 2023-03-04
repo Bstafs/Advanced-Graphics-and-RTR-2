@@ -17,7 +17,9 @@ cbuffer ConstantBuffer : register( b0 )
 	float4 vOutputColor;
 }
 
-Texture2D txDiffuse : register(t0);
+Texture2D txGrass : register(t0);
+Texture2D txStone : register(t1);
+Texture2D txSnow : register(t2);
 SamplerState samLinear : register(s0);
 
 #define MAX_LIGHTS 1
@@ -252,7 +254,6 @@ PS_INPUT DSMAIN(HS_CONSTANT_DATA_OUTPUT input, float3 barycentrucCoords : SV_Dom
 
 	output.Tex = barycentrucCoords.x * trianglePatch[0].Tex + barycentrucCoords.y * trianglePatch[1].Tex + barycentrucCoords.z * trianglePatch[2].Tex;
 
-
 	output.Norm = barycentrucCoords.x * trianglePatch[0].Norm + barycentrucCoords.y * trianglePatch[1].Norm + barycentrucCoords.z * trianglePatch[2].Norm;
 
 	output.Pos = mul(output.Pos, World);
@@ -279,7 +280,7 @@ float4 PS(PS_INPUT IN) : SV_TARGET
 
 	if (Material.UseTexture)
 	{
-		texColor = txDiffuse.Sample(samLinear, IN.Tex);
+		texColor = txGrass.Sample(samLinear, IN.Tex);
 	}
 
 	float4 finalColor = (emissive + ambient + diffuse + specular) * texColor;

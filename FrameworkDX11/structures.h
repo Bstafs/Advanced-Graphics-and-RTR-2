@@ -15,6 +15,20 @@ struct ConstantBuffer
 	XMFLOAT4 vOutputColor;
 };
 
+struct SimpleVertex
+{
+	XMFLOAT3 Pos;
+	XMFLOAT3 Normal;
+	XMFLOAT2 TexCoord;
+};
+
+struct HeightMapInfo
+{
+	int terrainWidth;
+	int terrainHeight;
+	XMFLOAT3* heightMap;
+};
+
 struct _Material
 {
 	_Material()
