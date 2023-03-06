@@ -14,11 +14,12 @@ cbuffer ConstantBuffer : register(b0)
 	matrix World;
 	matrix View;
 	matrix Projection;
-	matrix mProjectionView;
 	float4 vOutputColor;
 
 	int terrainID;
-	float3 padding01;
+	float terrainHeight;
+	float terrainBias;
+	float padding01;
 }
 
 Texture2D txGrass : register(t0);
@@ -264,11 +265,10 @@ PS_INPUT DSMAIN(HS_CONSTANT_DATA_OUTPUT input, float3 barycentrucCoords : SV_Dom
 
 	float fDisplacement = txDisplacementMap.SampleLevel(samLinear, output.Tex.xy, 0.0f).r;
 
-	float scale = 5.0f;
-	float bias = 10.0f;
 
-	fDisplacement *= scale;
-	fDisplacement += bias;
+
+	fDisplacement *= terrainHeight;
+	fDisplacement += terrainBias;
 
 	float3 vDirection = -output.Norm;
 

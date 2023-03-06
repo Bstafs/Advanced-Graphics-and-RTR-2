@@ -32,6 +32,7 @@ void KeyboardInput();
 void ImGuiRender();
 void Update();
 HRESULT CreateTerrain(int width, int height);
+void DiamondSquare(unsigned x1, unsigned y1, unsigned x2, unsigned y2, float range, unsigned level);
 
 
 //--------------------------------------------------------------------------------------
@@ -116,6 +117,8 @@ ID3D11ShaderResourceView* g_pTextureSnow = nullptr;
 ID3D11ShaderResourceView* g_pDispacementMap = nullptr;
 
 int terrainID;
+float terrainHeight = 4.0f;
+float terrainBias = 10.0f;
 
 //--------------------------------------------------------------------------------------
 // Entry point to the program. Initializes everything and goes into a message processing 
@@ -612,22 +615,13 @@ HRESULT		InitWorld(int width, int height)
 	ImGui_ImplDX11_Init(g_pd3dDevice, g_pImmediateContext);
 	ImGui::StyleColorsClassic();
 
-	// Initialize the view matrix
-	//XMVECTOR Eye = XMLoadFloat4(&g_EyePosition);
-	//XMVECTOR At = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
-	//XMVECTOR Up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-	//g_View = XMMatrixLookAtLH(Eye, At, Up);
-
-	// Initialize the projection matrix
-	//g_Projection = XMMatrixPerspectiveFovLH(XM_PIDIV2, width / (FLOAT)height, 0.01f, 100.0f);
-
 	g_pCamera0 = new Camera(XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), g_viewWidth, g_viewHeight, 0.01f, 100.0f);
 	g_pCurrentCamera = g_pCamera0;
 	g_pCurrentCamera->SetView();
 	g_pCurrentCamera->SetProjection();
 	g_pCurrentCamera->SetProjectionView();
 
-	CreateTerrain(25, 25);
+	CreateTerrain(50, 50);
 
 	return S_OK;
 }
@@ -722,7 +716,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
-
 HRESULT CreateTerrain(int width, int height)
 {
 	HRESULT hr;
@@ -758,7 +751,8 @@ HRESULT CreateTerrain(int width, int height)
 		{
 			float x = -halfWidth + j * dx;
 			float y = 0.0f;
-			v[i * columns + j].Pos = XMFLOAT3(x,y,z);
+
+			v[i * columns + j].Pos = XMFLOAT3(x, y, z);
 			v[i * columns + j].Normal = XMFLOAT3(0.0f, 1.0f, 0.0f);
 
 			v[i * columns + j].TexCoord.x = j * du;
@@ -840,7 +834,7 @@ void setupLightForRender()
 	XMVECTOR LightDirection = XMVectorSet(-LightPosition.x, -LightPosition.y, -LightPosition.z, 0.0f);
 	LightDirection = XMVector3Normalize(LightDirection);
 	XMStoreFloat4(&light.Direction, LightDirection);
-	
+
 
 	LightPropertiesConstantBuffer lightProperties;
 	lightProperties.EyePosition = LightPosition;
@@ -983,11 +977,14 @@ void ImGuiRender()
 	}
 	if (ImGui::CollapsingHeader("Terrain"))
 	{
+		ImGui::DragFloat("Terrain Height", &terrainHeight);
+		ImGui::DragFloat("Terrain Bias", &terrainBias);
+
 		if (ImGui::Button("Grid"))
 		{
 			terrainID = 0;
 		}
-		if(ImGui::Button("Displacement Map"))
+		if (ImGui::Button("Displacement Map"))
 		{
 			terrainID = 1;
 		}
@@ -1020,13 +1017,8 @@ void Render()
 	cb1.mView = XMMatrixTranspose(XMLoadFloat4x4(g_pCurrentCamera->GetView()));
 	cb1.mProjection = XMMatrixTranspose(XMLoadFloat4x4(g_pCurrentCamera->GetProjection()));
 	cb1.terrainID = terrainID;
-
-	XMMATRIX temp;
-	temp = XMMatrixMultiply(myTerrain, XMLoadFloat4x4(g_pCurrentCamera->GetProjectionView()));
-
-	XMMATRIX worldProjView = XMMatrixTranspose(temp);
-
-	cb1.mProjectionView = worldProjView;
+	cb1.terrainHeight = terrainHeight;
+	cb1.terrainBias = terrainBias;
 	cb1.vOutputColor = XMFLOAT4(1, 1, 1, 0);
 
 	g_pImmediateContext->UpdateSubresource(g_pConstantBuffer, 0, nullptr, &cb1, 0, 0);
