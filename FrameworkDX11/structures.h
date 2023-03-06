@@ -12,7 +12,11 @@ struct ConstantBuffer
 	XMMATRIX mWorld;
 	XMMATRIX mView;
 	XMMATRIX mProjection;
+	XMMATRIX mProjectionView;
 	XMFLOAT4 vOutputColor;
+
+	int terrainID;
+	XMFLOAT3 padding01;
 };
 
 struct SimpleVertex

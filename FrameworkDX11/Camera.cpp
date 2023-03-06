@@ -42,6 +42,20 @@ void Camera::SetOrthoProjection()
 	XMStoreFloat4x4(&_projectionOrtho, XMMatrixOrthographicLH(_windowWidth, _windowHeight, _nearDepth, _farDepth));
 }
 
+void Camera::SetProjectionView()
+{
+
+	XMMATRIX proj = XMLoadFloat4x4(&_projection);
+	XMMATRIX view = XMLoadFloat4x4(&_view);
+	XMMATRIX temp = XMMatrixMultiply(proj, view);
+
+
+
+	XMStoreFloat4x4(&_projectionView, temp);
+}
+
+
+
 void Camera::Reshape(FLOAT windowWidth, FLOAT windowHeight, FLOAT nearDepth, FLOAT farDepth)
 {
 	_windowHeight = windowHeight;

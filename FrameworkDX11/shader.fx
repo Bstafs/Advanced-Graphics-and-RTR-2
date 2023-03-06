@@ -9,17 +9,22 @@
 //--------------------------------------------------------------------------------------
 // Constant Buffer Variables
 //--------------------------------------------------------------------------------------
-cbuffer ConstantBuffer : register( b0 )
+cbuffer ConstantBuffer : register(b0)
 {
 	matrix World;
 	matrix View;
 	matrix Projection;
+	matrix mProjectionView;
 	float4 vOutputColor;
+
+	int terrainID;
+	float3 padding01;
 }
 
 Texture2D txGrass : register(t0);
 Texture2D txStone : register(t1);
 Texture2D txSnow : register(t2);
+Texture2D txDisplacementMap : register(t3);
 SamplerState samLinear : register(s0);
 
 #define MAX_LIGHTS 1
@@ -75,14 +80,14 @@ cbuffer LightProperties : register(b2)
 	float4 GlobalAmbient;               // 16 bytes
 										//----------------------------------- (16 byte boundary)
 	Light Lights[MAX_LIGHTS];           // 80 * 8 = 640 bytes
-}; 
+};
 
 //--------------------------------------------------------------------------------------
 
 // Vertex Shader
 struct VS_INPUT
 {
-    float4 Pos : POSITION;
+	float4 Pos : POSITION;
 	float3 Norm : NORMAL;
 	float2 Tex : TEXCOORD0;
 };
@@ -99,7 +104,7 @@ struct HS_INPUT
 // Pixel Shader
 struct PS_INPUT
 {
-    float4 Pos : SV_POSITION;
+	float4 Pos : SV_POSITION;
 	float4 worldPos : POSITION;
 	float3 Norm : NORMAL;
 	float2 Tex : TEXCOORD0;
@@ -119,7 +124,7 @@ float4 DoDiffuse(Light light, float3 L, float3 N)
 
 float4 DoSpecular(Light lightObject, float3 vertexToEye, float3 lightDirectionToVertex, float3 Normal)
 {
-	float4 lightDir = float4(normalize(-lightDirectionToVertex),1);
+	float4 lightDir = float4(normalize(-lightDirectionToVertex), 1);
 	vertexToEye = normalize(vertexToEye);
 
 	float lightIntensity = saturate(dot(Normal, lightDir));
@@ -150,7 +155,7 @@ LightingResult DoPointLight(Light light, float3 vertexToEye, float4 vertexPos, f
 
 	float3 LightDirectionToVertex = (vertexPos - light.Position).xyz;
 	float distance = length(LightDirectionToVertex);
-	LightDirectionToVertex = LightDirectionToVertex  / distance;
+	LightDirectionToVertex = LightDirectionToVertex / distance;
 
 	float3 vertexToLight = (light.Position - vertexPos).xyz;
 	distance = length(vertexToLight);
@@ -177,11 +182,11 @@ LightingResult ComputeLighting(float4 vertexPos, float3 N)
 	{
 		LightingResult result = { { 0, 0, 0, 0 },{ 0, 0, 0, 0 } };
 
-		if (!Lights[i].Enabled) 
+		if (!Lights[i].Enabled)
 			continue;
-		
+
 		result = DoPointLight(Lights[i], vertexToEye, vertexPos, N);
-		
+
 		totalResult.Diffuse += result.Diffuse;
 		totalResult.Specular += result.Specular;
 	}
@@ -195,30 +200,30 @@ LightingResult ComputeLighting(float4 vertexPos, float3 N)
 //--------------------------------------------------------------------------------------
 // Vertex Shader
 //--------------------------------------------------------------------------------------
-PS_INPUT VS( VS_INPUT input )
+PS_INPUT VS(VS_INPUT input)
 {
-    PS_INPUT output = (PS_INPUT)0;
+	PS_INPUT output = (PS_INPUT)0;
 
- //   output.Pos = mul( input.Pos, World );
- //   output.worldPos = output.Pos;
- //   output.Pos = mul( output.Pos, View );
- //   output.Pos = mul( output.Pos, Projection );
+	//   output.Pos = mul( input.Pos, World );
+	//   output.worldPos = output.Pos;
+	//   output.Pos = mul( output.Pos, View );
+	//   output.Pos = mul( output.Pos, Projection );
 
 	output.Pos = input.Pos;
 	output.Norm = mul(float4(input.Norm, 0), World).xyz;
 	output.Tex = input.Tex;
-    
-    return output;
+
+	return output;
 }
 //--------------------------------------------------------------------------------------
 // Hull Shader Control Point Phase
 //--------------------------------------------------------------------------------------
 [domain("tri")]
-[partitioning("fractional_even")]
+[partitioning("integer")]
 [outputtopology("triangle_cw")]
 [outputcontrolpoints(3)]
 [patchconstantfunc("PassThroughConstantHS")]
-[maxtessfactor(16.0)]
+[maxtessfactor(64.0)]
 HS_INPUT HSMAIN(InputPatch<HS_INPUT, 3> ip, uint i : SV_OutputControlPointID, uint PatchID : SV_PrimitiveID)
 {
 	HS_INPUT output;
@@ -248,13 +253,31 @@ HS_CONSTANT_DATA_OUTPUT PassThroughConstantHS(InputPatch<HS_INPUT, 3> ip, uint P
 PS_INPUT DSMAIN(HS_CONSTANT_DATA_OUTPUT input, float3 barycentrucCoords : SV_DomainLocation, const OutputPatch<HS_INPUT, 3> trianglePatch)
 {
 	PS_INPUT output;
-	float3 worldPos = barycentrucCoords.x * trianglePatch[0].Pos + barycentrucCoords.y * trianglePatch[1].Pos + barycentrucCoords.z * trianglePatch[2].Pos;
 
-	output.Pos = float4(worldPos.xyz, 1.0f);
+	float3 worldPos = barycentrucCoords.x * trianglePatch[0].Pos + barycentrucCoords.y * trianglePatch[1].Pos + barycentrucCoords.z * trianglePatch[2].Pos;
 
 	output.Tex = barycentrucCoords.x * trianglePatch[0].Tex + barycentrucCoords.y * trianglePatch[1].Tex + barycentrucCoords.z * trianglePatch[2].Tex;
 
 	output.Norm = barycentrucCoords.x * trianglePatch[0].Norm + barycentrucCoords.y * trianglePatch[1].Norm + barycentrucCoords.z * trianglePatch[2].Norm;
+
+	output.Norm = normalize(output.Norm);
+
+	float fDisplacement = txDisplacementMap.SampleLevel(samLinear, output.Tex.xy, 0.0f).r;
+
+	float scale = 5.0f;
+	float bias = 10.0f;
+
+	fDisplacement *= scale;
+	fDisplacement += bias;
+
+	float3 vDirection = -output.Norm;
+
+	if(terrainID == 1)
+	{
+		worldPos += vDirection * fDisplacement;
+	}
+
+	output.Pos = float4(worldPos.xyz, 1.0f);
 
 	output.Pos = mul(output.Pos, World);
 	output.worldPos = output.Pos;

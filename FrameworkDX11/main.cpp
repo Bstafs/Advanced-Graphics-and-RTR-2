@@ -16,7 +16,7 @@
 
 #include "main.h"
 
-DirectX::XMFLOAT4 g_EyePosition(0.0f, 0, -3, 1.0f);
+DirectX::XMFLOAT4 g_EyePosition(0.0f, 0, -0, 1.0f);
 XMFLOAT4 LightPosition(g_EyePosition);
 //--------------------------------------------------------------------------------------
 // Forward declarations
@@ -31,7 +31,7 @@ void		Render();
 void KeyboardInput();
 void ImGuiRender();
 void Update();
-HRESULT CreateTerrain(int width, int height, string filename);
+HRESULT CreateTerrain(int width, int height);
 
 
 //--------------------------------------------------------------------------------------
@@ -113,6 +113,9 @@ XMFLOAT4X4 g_Terrian;
 ID3D11ShaderResourceView* g_pTextureGrass = nullptr;
 ID3D11ShaderResourceView* g_pTextureStone = nullptr;
 ID3D11ShaderResourceView* g_pTextureSnow = nullptr;
+ID3D11ShaderResourceView* g_pDispacementMap = nullptr;
+
+int terrainID;
 
 //--------------------------------------------------------------------------------------
 // Entry point to the program. Initializes everything and goes into a message processing 
@@ -418,7 +421,7 @@ HRESULT InitDevice()
 	D3D11_RASTERIZER_DESC rs = {};
 	ZeroMemory(&rs, sizeof(D3D11_RASTERIZER_DESC));
 	rs.FillMode = D3D11_FILL_WIREFRAME;
-	rs.CullMode = D3D11_CULL_NONE;
+	rs.CullMode = D3D11_CULL_BACK;
 	hr = g_pd3dDevice->CreateRasterizerState(&rs, &g_pWireFrame);
 
 	D3D11_SAMPLER_DESC sampDesc;
@@ -450,6 +453,7 @@ HRESULT InitDevice()
 	hr = CreateDDSTextureFromFile(g_pd3dDevice, L"grass.dds", nullptr, &g_pTextureGrass);
 	hr = CreateDDSTextureFromFile(g_pd3dDevice, L"stone.dds", nullptr, &g_pTextureStone);
 	hr = CreateDDSTextureFromFile(g_pd3dDevice, L"snow.dds", nullptr, &g_pTextureSnow);
+	hr = CreateDDSTextureFromFile(g_pd3dDevice, L"HeightMap.dds", nullptr, &g_pDispacementMap);
 
 	hr = InitMesh();
 	if (FAILED(hr))
@@ -621,8 +625,9 @@ HRESULT		InitWorld(int width, int height)
 	g_pCurrentCamera = g_pCamera0;
 	g_pCurrentCamera->SetView();
 	g_pCurrentCamera->SetProjection();
+	g_pCurrentCamera->SetProjectionView();
 
-	CreateTerrain(100, 100, "terrain2.raw");
+	CreateTerrain(25, 25);
 
 	return S_OK;
 }
@@ -718,38 +723,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 }
 
 
-
-HRESULT CreateTerrain(int width, int height, string filename)
+HRESULT CreateTerrain(int width, int height)
 {
 	HRESULT hr;
-
-	// Height Map Loading
-	XMFLOAT3* heightMap;
-
-	int heightMapWidth = 512;
-	int heightMapHeight = 512;
-	int heightScale = 10;
-
-	vector<unsigned char> in(heightMapWidth * heightMapHeight);
-
-	std::ifstream inFile;
-	inFile.open(filename.c_str(), std::ios_base::binary);
-
-	if(inFile)
-	{
-		inFile.read((char*)&in[0], (std::streamsize)in.size());
-
-		inFile.close();
-	}
-
-	heightMap = new XMFLOAT3[heightMapHeight * heightMapWidth];
-
-	for(UINT i =0; i < heightMapHeight * heightMapWidth; ++i)
-	{
-		heightMap[i].x = (in[i] / 255.0f) * heightScale;
-		heightMap[i].y = (in[i] / 255.0f) * heightScale;
-		heightMap[i].z = (in[i] / 255.0f) * heightScale;
-	}
 
 	// Grid Generation
 	rows = width;
@@ -781,7 +757,7 @@ HRESULT CreateTerrain(int width, int height, string filename)
 		for (UINT j = 0; j < columns; ++j)
 		{
 			float x = -halfWidth + j * dx;
-			float y = heightMap[j + i * rows].y;
+			float y = 0.0f;
 			v[i * columns + j].Pos = XMFLOAT3(x,y,z);
 			v[i * columns + j].Normal = XMFLOAT3(0.0f, 1.0f, 0.0f);
 
@@ -880,8 +856,9 @@ void Update()
 
 	g_pCurrentCamera->SetView();
 	g_pCurrentCamera->SetProjection();
+	g_pCurrentCamera->SetProjectionView();
 
-	XMStoreFloat4x4(&g_Terrian, XMMatrixTranslation(0.0f, -15.0f, 0.0f));
+	XMStoreFloat4x4(&g_Terrian, XMMatrixTranslation(0.0f, -0.5f, 0.0f));
 }
 
 void KeyboardInput()
@@ -1004,6 +981,17 @@ void ImGuiRender()
 	{
 		ImGui::Checkbox("Wire Frame Mode", &isWireFrame);
 	}
+	if (ImGui::CollapsingHeader("Terrain"))
+	{
+		if (ImGui::Button("Grid"))
+		{
+			terrainID = 0;
+		}
+		if(ImGui::Button("Displacement Map"))
+		{
+			terrainID = 1;
+		}
+	}
 	ImGui::End();
 	ImGui::Render();
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
@@ -1031,6 +1019,14 @@ void Render()
 	cb1.mWorld = XMMatrixTranspose(myTerrain);
 	cb1.mView = XMMatrixTranspose(XMLoadFloat4x4(g_pCurrentCamera->GetView()));
 	cb1.mProjection = XMMatrixTranspose(XMLoadFloat4x4(g_pCurrentCamera->GetProjection()));
+	cb1.terrainID = terrainID;
+
+	XMMATRIX temp;
+	temp = XMMatrixMultiply(myTerrain, XMLoadFloat4x4(g_pCurrentCamera->GetProjectionView()));
+
+	XMMATRIX worldProjView = XMMatrixTranspose(temp);
+
+	cb1.mProjectionView = worldProjView;
 	cb1.vOutputColor = XMFLOAT4(1, 1, 1, 0);
 
 	g_pImmediateContext->UpdateSubresource(g_pConstantBuffer, 0, nullptr, &cb1, 0, 0);
@@ -1040,6 +1036,8 @@ void Render()
 
 	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pGridVertexBuffer, &stride, &offset);
 	g_pImmediateContext->IASetIndexBuffer(g_pGridIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+
+	g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST);
 
 	// Vertex Shader Stage
 	g_pImmediateContext->VSSetShader(g_pVertexShader, nullptr, 0);
@@ -1055,6 +1053,8 @@ void Render()
 	// Domain Shader Stage
 	g_pImmediateContext->DSSetShader(g_pDomainShader, nullptr, 0);
 	g_pImmediateContext->DSSetConstantBuffers(0, 1, &g_pConstantBuffer);
+	g_pImmediateContext->DSSetSamplers(0, 1, &g_pSamplerState);
+	g_pImmediateContext->DSSetShaderResources(3, 1, &g_pDispacementMap);
 
 	// Geometry Shader
 
@@ -1066,9 +1066,11 @@ void Render()
 	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureGrass);
 	g_pImmediateContext->PSSetShaderResources(1, 1, &g_pTextureStone);
 	g_pImmediateContext->PSSetShaderResources(2, 1, &g_pTextureSnow);
+	g_pImmediateContext->PSSetShaderResources(3, 1, &g_pDispacementMap);
 	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerState);
 
-	g_pImmediateContext->DrawIndexed(totalFaces, 0, 0);
+	g_pImmediateContext->DrawIndexed(totalFaces * 3, 0, 0);
+
 
 	g_pImmediateContext->Flush();
 
