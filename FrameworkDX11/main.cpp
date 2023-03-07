@@ -31,10 +31,14 @@ void		Render();
 void KeyboardInput();
 void ImGuiRender();
 void Update();
-HRESULT CreateTerrain(int width, int height);
-void DiamondSquare(unsigned x1, unsigned y1, unsigned x2, unsigned y2, float range, unsigned level);
+HRESULT CreateTerrainGridHM();
+HRESULT CreateTerrainDiamondSquare();
+void DiamondStep(int sideLength);
 
-
+void SquareStep(int sideLength);
+void average(int x, int y, int sideLength);
+void print_map();
+void GenerationDiamondSquare();
 //--------------------------------------------------------------------------------------
 // Global Variables
 //--------------------------------------------------------------------------------------
@@ -70,6 +74,9 @@ ID3D11SamplerState* g_pSamplerState = nullptr;
 
 ID3D11Buffer* g_pGridVertexBuffer = nullptr;
 ID3D11Buffer* g_pGridIndexBuffer = nullptr;
+
+ID3D11Buffer* g_pGridDSVertexBuffer = nullptr;
+ID3D11Buffer* g_pGridDSIndexBuffer = nullptr;
 
 ID3D11Buffer* g_pTerrainMaterialBuffer = nullptr;
 MaterialPropertiesConstantBuffer	m_material;
@@ -116,9 +123,17 @@ ID3D11ShaderResourceView* g_pTextureStone = nullptr;
 ID3D11ShaderResourceView* g_pTextureSnow = nullptr;
 ID3D11ShaderResourceView* g_pDispacementMap = nullptr;
 
+XMFLOAT3 terrainPos = XMFLOAT3(0.0f, -5.0f, 0.0f);
+
 int terrainID;
 float terrainHeight = 4.0f;
-float terrainBias = 10.0f;
+float terrainBias = 0.0f;
+
+bool diamondSquare = false;
+int randomSeed = 100;
+
+int imGUIRoughness = 33; 
+
 
 //--------------------------------------------------------------------------------------
 // Entry point to the program. Initializes everything and goes into a message processing 
@@ -615,13 +630,14 @@ HRESULT		InitWorld(int width, int height)
 	ImGui_ImplDX11_Init(g_pd3dDevice, g_pImmediateContext);
 	ImGui::StyleColorsClassic();
 
-	g_pCamera0 = new Camera(XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), g_viewWidth, g_viewHeight, 0.01f, 100.0f);
+	g_pCamera0 = new Camera(XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), g_viewWidth, g_viewHeight, 0.01f, 10000.0f);
 	g_pCurrentCamera = g_pCamera0;
 	g_pCurrentCamera->SetView();
 	g_pCurrentCamera->SetProjection();
 	g_pCurrentCamera->SetProjectionView();
 
-	CreateTerrain(50, 50);
+	CreateTerrainGridHM();
+	CreateTerrainDiamondSquare();
 
 	return S_OK;
 }
@@ -716,30 +732,144 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
-HRESULT CreateTerrain(int width, int height)
+void DiamondStep(int sideLength)
+{
+	srand(randomSeed);
+
+	int halfSide = sideLength / 2;
+
+	for (int y = 0; y < terrainSize / (sideLength - 1); y++)
+	{
+		for (int x = 0; x < terrainSize / (sideLength - 1); x++)
+		{
+			int center_x = x * (sideLength - 1) + halfSide;
+			int center_y = y * (sideLength - 1) + halfSide;
+
+			int avg = (map[x * (sideLength - 1)][y * (sideLength - 1)] +
+				map[x * (sideLength - 1)][(y + 1) * (sideLength - 1)] +
+				map[(x + 1) * (sideLength - 1)][y * (sideLength - 1)] +
+				map[(x + 1) * (sideLength - 1)][(y + 1) * (sideLength - 1)]) / 4.0f;
+
+			map[center_x][center_y] = avg + rand() % roughness + -roughness;
+		}
+	}
+
+}
+
+void SquareStep(int sideLength)
+{
+	int halfLength = sideLength / 2;
+
+	for (int y = 0; y < terrainSize / (sideLength - 1); y++)
+	{
+		for (int x = 0; x < terrainSize / (sideLength - 1); x++)
+		{
+			// Top
+			average(x * (sideLength - 1) + halfLength, y * (sideLength - 1), sideLength);
+			// Right
+			average((x + 1) * (sideLength - 1), y * (sideLength - 1) + halfLength,
+				sideLength);
+			// Bottom
+			average(x * (sideLength - 1) + halfLength, (y + 1) * (sideLength - 1), sideLength);
+			// Left
+			average(x * (sideLength - 1), y * (sideLength - 1) + halfLength, sideLength);
+		}
+	}
+
+}
+
+void average(int x, int y, int sideLength)
+{
+	srand(randomSeed);
+
+	float counter = 0;
+	float accumulator = 0;
+
+	int halfSide = sideLength / 2;
+
+	if (x != 0)
+	{
+		counter += 1.0f;
+		accumulator += map[y][x - halfSide];
+	}
+	if (y != 0)
+	{
+		counter += 1.0f;
+		accumulator += map[y - halfSide][x];
+	}
+	if (x != terrainSize - 1)
+	{
+		counter += 1.0f;
+		accumulator += map[y][x + halfSide];
+	}
+	if (y != terrainSize - 1)
+	{
+		counter += 1.0f;
+		accumulator += map[y + halfSide][x];
+	}
+
+	map[y][x] = (accumulator / counter) + rand() % roughness + -roughness;
+}
+
+void print_map()
+{
+	for (int i = 0; i < terrainSize; i++)
+	{
+		for (int j = 0; j < terrainSize; j++)
+		{
+			std::cout << map[i][j];
+		}
+		std::cout << std::endl;
+	}
+}
+
+void GenerationDiamondSquare()
+{
+	int sideLength = terrainSize / 2;
+
+	DiamondStep(terrainSize);
+	SquareStep(terrainSize);
+
+	roughness /= 2;
+
+	while (sideLength >= 2)
+	{
+		DiamondStep(sideLength + 1);
+		SquareStep(sideLength + 1);
+		sideLength /= 2;
+
+		if (roughness >= 2)
+		{
+			roughness /= 2;
+		}
+	}
+
+	print_map();
+}
+
+
+HRESULT CreateTerrainGridHM()
 {
 	HRESULT hr;
 
 	// Grid Generation
-	rows = width;
-	columns = height;
+	rows = terrainSize;
+	columns = terrainSize;
 
-	depth = height;
-
-	float halfDepth = 0.5f * depth;
-	float halfWidth = 0.5f * width;
+	float halfDepth = 0.5f * columns;
+	float halfWidth = 0.5f * rows;
 
 	rows = rows - 1;
 	columns = columns - 1;
-	totalCells = (rows - 1) * (columns - 1);
-	totalFaces = (rows - 1) * (columns - 1) * 2 * 6;
+	totalCells = rows * columns;
+	totalFaces = rows * columns * 2;
 	totalVertices = rows * columns;
 
-	dx = width / (columns - 1);
-	dz = depth / (rows - 1);
+	dx = rows / (columns);
+	dz = columns / (rows);
 
-	du = 1.0f / (columns - 1);
-	dv = 1.0f / (rows - 1);
+	du = 1.0f / (columns);
+	dv = 1.0f / (rows);
 
 	std::vector<SimpleVertex> v(totalVertices);
 
@@ -749,7 +879,7 @@ HRESULT CreateTerrain(int width, int height)
 		float z = halfDepth - i * dz;
 		for (UINT j = 0; j < columns; ++j)
 		{
-			float x = -halfWidth + j * dx;
+			float x = j * dx + (-dx * 0.5);
 			float y = 0.0f;
 
 			v[i * columns + j].Pos = XMFLOAT3(x, y, z);
@@ -782,14 +912,14 @@ HRESULT CreateTerrain(int width, int height)
 	// Vertex Buffer
 	D3D11_BUFFER_DESC bd;
 	ZeroMemory(&bd, sizeof(bd));
-	bd.Usage = D3D11_USAGE_IMMUTABLE;
-	bd.ByteWidth = sizeof(SimpleVertex) * v.size();
+	bd.Usage = D3D11_USAGE_DEFAULT;
+	bd.ByteWidth = sizeof(SimpleVertex) * totalVertices;
 	bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 	bd.CPUAccessFlags = 0;
 
 	D3D11_SUBRESOURCE_DATA InitData;
 	ZeroMemory(&InitData, sizeof(InitData));
-	InitData.pSysMem = &v[0];
+	InitData.pSysMem = v.data();
 	hr = g_pd3dDevice->CreateBuffer(&bd, &InitData, &g_pGridVertexBuffer);
 
 	if (FAILED(hr))
@@ -806,7 +936,7 @@ HRESULT CreateTerrain(int width, int height)
 
 	D3D11_SUBRESOURCE_DATA InitData2;
 	ZeroMemory(&InitData2, sizeof(InitData2));
-	InitData2.pSysMem = &indices[0];
+	InitData2.pSysMem = indices.data();
 	hr = g_pd3dDevice->CreateBuffer(&bd2, &InitData2, &g_pGridIndexBuffer);
 
 	if (FAILED(hr))
@@ -816,6 +946,105 @@ HRESULT CreateTerrain(int width, int height)
 	return hr;
 }
 
+HRESULT CreateTerrainDiamondSquare()
+{
+	HRESULT hr;
+
+	GenerationDiamondSquare();
+
+	// Grid Generation
+	rows = terrainSize;
+	columns = terrainSize;
+
+	float halfDepth = 0.5f * columns;
+	float halfWidth = 0.5f * rows;
+
+	rows = rows - 1;
+	columns = columns - 1;
+	totalCells = rows * columns;
+	totalFaces = rows * columns * 2;
+	totalVertices = rows * columns;
+
+	dx = rows / (columns);
+	dz = columns / (rows);
+
+	du = 1.0f / (columns);
+	dv = 1.0f / (rows);
+
+	std::vector<SimpleVertex> v(totalVertices);
+
+	// Vertex Generation
+	for (UINT i = 0; i < rows; ++i)
+	{
+		float z = halfDepth - i * dz;
+		for (UINT j = 0; j < columns; ++j)
+		{
+			float x = j * dx + (-dx * 0.5);
+			float y = map[i][j];
+
+			v[i * columns + j].Pos = XMFLOAT3(x, y, z);
+			v[i * columns + j].Normal = XMFLOAT3(0.0f, 1.0f, 0.0f);
+
+			v[i * columns + j].TexCoord.x = j * du;
+			v[i * columns + j].TexCoord.y = i * dv;
+		}
+	}
+
+	std::vector<WORD> indices(totalFaces * 3);
+
+	int k = 0;
+	// Index Generation
+	for (UINT i = 0; i < rows - 1; ++i)
+	{
+		for (UINT j = 0; j < columns - 1; ++j)
+		{
+			indices[k] = i * columns + j;
+			indices[k + 1] = i * columns + j + 1;
+			indices[k + 2] = (i + 1) * columns + j;
+			indices[k + 3] = (i + 1) * columns + j;
+			indices[k + 4] = i * columns + j + 1;
+			indices[k + 5] = (i + 1) * columns + j + 1;
+
+			k += 6;
+		}
+	}
+
+	// Vertex Buffer
+	D3D11_BUFFER_DESC bd;
+	ZeroMemory(&bd, sizeof(bd));
+	bd.Usage = D3D11_USAGE_DEFAULT;
+	bd.ByteWidth = sizeof(SimpleVertex) * totalVertices;
+	bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	bd.CPUAccessFlags = 0;
+
+	D3D11_SUBRESOURCE_DATA InitData;
+	ZeroMemory(&InitData, sizeof(InitData));
+	InitData.pSysMem = v.data();
+	hr = g_pd3dDevice->CreateBuffer(&bd, &InitData, &g_pGridDSVertexBuffer);
+
+	if (FAILED(hr))
+		return hr;
+
+	// Index Buffer
+	D3D11_BUFFER_DESC bd2;
+	ZeroMemory(&bd2, sizeof(bd2));
+
+	bd2.Usage = D3D11_USAGE_DEFAULT;
+	bd2.ByteWidth = sizeof(WORD) * indices.size();
+	bd2.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	bd2.CPUAccessFlags = 0;
+
+	D3D11_SUBRESOURCE_DATA InitData2;
+	ZeroMemory(&InitData2, sizeof(InitData2));
+	InitData2.pSysMem = indices.data();
+	hr = g_pd3dDevice->CreateBuffer(&bd2, &InitData2, &g_pGridDSIndexBuffer);
+
+	if (FAILED(hr))
+		return hr;
+
+
+	return hr;
+}
 
 void setupLightForRender()
 {
@@ -828,13 +1057,11 @@ void setupLightForRender()
 	light.LinearAttenuation = 1;
 	light.QuadraticAttenuation = 1;
 
-
 	// set up the light
 	light.Position = LightPosition;
 	XMVECTOR LightDirection = XMVectorSet(-LightPosition.x, -LightPosition.y, -LightPosition.z, 0.0f);
 	LightDirection = XMVector3Normalize(LightDirection);
 	XMStoreFloat4(&light.Direction, LightDirection);
-
 
 	LightPropertiesConstantBuffer lightProperties;
 	lightProperties.EyePosition = LightPosition;
@@ -852,7 +1079,7 @@ void Update()
 	g_pCurrentCamera->SetProjection();
 	g_pCurrentCamera->SetProjectionView();
 
-	XMStoreFloat4x4(&g_Terrian, XMMatrixTranslation(0.0f, -0.5f, 0.0f));
+	XMStoreFloat4x4(&g_Terrian, XMMatrixTranslation(terrainPos.x, terrainPos.y, terrainPos.z));
 }
 
 void KeyboardInput()
@@ -977,17 +1204,36 @@ void ImGuiRender()
 	}
 	if (ImGui::CollapsingHeader("Terrain"))
 	{
+
+		ImGui::DragFloat3("Terain Position", &terrainPos.x);
 		ImGui::DragFloat("Terrain Height", &terrainHeight);
 		ImGui::DragFloat("Terrain Bias", &terrainBias);
 
-		if (ImGui::Button("Grid"))
+		if (ImGui::CollapsingHeader("Static Terrain"))
 		{
-			terrainID = 0;
+			if (ImGui::Button("Grid"))
+			{
+				terrainID = 0;
+			}
+			if (ImGui::Button("Displacement Map"))
+			{
+				terrainID = 1;
+			}
 		}
-		if (ImGui::Button("Displacement Map"))
+		if (ImGui::CollapsingHeader("Procedural Terrain"))
 		{
-			terrainID = 1;
+			ImGui::DragInt("Terrain Seed: ", &randomSeed);
+			ImGui::DragInt("Roughness", &imGUIRoughness, 1.0f, 1.0f);
+
+			ImGui::Checkbox("Diamond Square Algorithm", &diamondSquare);
+			if (ImGui::Button("Generate Diamond Square") && diamondSquare == true)
+			{
+				roughness = imGUIRoughness;
+				CreateTerrainDiamondSquare();
+			}
 		}
+
+
 	}
 	ImGui::End();
 	ImGui::Render();
@@ -1026,8 +1272,16 @@ void Render()
 
 	setupLightForRender();
 
-	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pGridVertexBuffer, &stride, &offset);
-	g_pImmediateContext->IASetIndexBuffer(g_pGridIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+	if (diamondSquare == true)
+	{
+		g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pGridDSVertexBuffer, &stride, &offset);
+		g_pImmediateContext->IASetIndexBuffer(g_pGridDSIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+	}
+	else
+	{
+		g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pGridVertexBuffer, &stride, &offset);
+		g_pImmediateContext->IASetIndexBuffer(g_pGridIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+	}
 
 	g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST);
 
@@ -1062,7 +1316,6 @@ void Render()
 	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerState);
 
 	g_pImmediateContext->DrawIndexed(totalFaces * 3, 0, 0);
-
 
 	g_pImmediateContext->Flush();
 

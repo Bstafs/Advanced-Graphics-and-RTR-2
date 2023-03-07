@@ -239,7 +239,7 @@ HS_INPUT HSMAIN(InputPatch<HS_INPUT, 3> ip, uint i : SV_OutputControlPointID, ui
 //--------------------------------------------------------------------------------------
 HS_CONSTANT_DATA_OUTPUT PassThroughConstantHS(InputPatch<HS_INPUT, 3> ip, uint PatchID : SV_PrimitiveID)
 {
-	float tessellationFactor = 16.0f;
+	float tessellationFactor = 8.0f;
 	HS_CONSTANT_DATA_OUTPUT output;
 	output.Edges[0] = tessellationFactor;
 	output.Edges[1] = tessellationFactor;
@@ -264,8 +264,6 @@ PS_INPUT DSMAIN(HS_CONSTANT_DATA_OUTPUT input, float3 barycentrucCoords : SV_Dom
 	output.Norm = normalize(output.Norm);
 
 	float fDisplacement = txDisplacementMap.SampleLevel(samLinear, output.Tex.xy, 0.0f).r;
-
-
 
 	fDisplacement *= terrainHeight;
 	fDisplacement += terrainBias;

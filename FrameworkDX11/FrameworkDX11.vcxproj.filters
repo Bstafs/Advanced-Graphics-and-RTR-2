@@ -30,7 +30,6 @@
     </ClCompile>
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Terrain.cpp" />
-    <ClCompile Include="DiamondSquare.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DDSTextureLoader.h" />
@@ -64,7 +63,6 @@
     </ClInclude>
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Terrain.h" />
-    <ClInclude Include="DiamondSquare.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Tutorial01.rc" />
