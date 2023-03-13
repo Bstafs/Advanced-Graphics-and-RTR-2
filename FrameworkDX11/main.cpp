@@ -33,11 +33,11 @@ void ImGuiRender();
 void Update();
 HRESULT CreateTerrainGridHM();
 HRESULT CreateTerrainDiamondSquare();
-void DiamondStep(int sideLength);
+HRESULT CreateTerrainFaultFormation();
 
+void DiamondStep(int sideLength);
 void SquareStep(int sideLength);
 void average(int x, int y, int sideLength);
-void print_map();
 void GenerationDiamondSquare();
 //--------------------------------------------------------------------------------------
 // Global Variables
@@ -77,6 +77,9 @@ ID3D11Buffer* g_pGridIndexBuffer = nullptr;
 
 ID3D11Buffer* g_pGridDSVertexBuffer = nullptr;
 ID3D11Buffer* g_pGridDSIndexBuffer = nullptr;
+
+ID3D11Buffer* g_pGridFFVertexBuffer = nullptr;
+ID3D11Buffer* g_pGridFFIndexBuffer = nullptr;
 
 ID3D11Buffer* g_pTerrainMaterialBuffer = nullptr;
 MaterialPropertiesConstantBuffer	m_material;
@@ -124,15 +127,17 @@ ID3D11ShaderResourceView* g_pTextureSnow = nullptr;
 ID3D11ShaderResourceView* g_pDispacementMap = nullptr;
 
 XMFLOAT3 terrainPos = XMFLOAT3(0.0f, -5.0f, 0.0f);
+XMFLOAT3 terrainRot = XMFLOAT3(0.0f, 0.0f, 0.0f);
 
 int terrainID;
 float terrainHeight = 4.0f;
 float terrainBias = 0.0f;
 
 bool diamondSquare = false;
+bool faultFormation = false;
 int randomSeed = 100;
 
-int imGUIRoughness = 33; 
+int imGUIRoughness = 15;
 
 
 //--------------------------------------------------------------------------------------
@@ -638,6 +643,7 @@ HRESULT		InitWorld(int width, int height)
 
 	CreateTerrainGridHM();
 	CreateTerrainDiamondSquare();
+	CreateTerrainFaultFormation();
 
 	return S_OK;
 }
@@ -738,9 +744,9 @@ void DiamondStep(int sideLength)
 
 	int halfSide = sideLength / 2;
 
-	for (int y = 0; y < terrainSize / (sideLength - 1); y++)
+	for (int y = 0; y < terrainSizeHeight / (sideLength - 1); y++)
 	{
-		for (int x = 0; x < terrainSize / (sideLength - 1); x++)
+		for (int x = 0; x < terrainSizeWidth / (sideLength - 1); x++)
 		{
 			int center_x = x * (sideLength - 1) + halfSide;
 			int center_y = y * (sideLength - 1) + halfSide;
@@ -760,9 +766,9 @@ void SquareStep(int sideLength)
 {
 	int halfLength = sideLength / 2;
 
-	for (int y = 0; y < terrainSize / (sideLength - 1); y++)
+	for (int y = 0; y < terrainSizeHeight / (sideLength - 1); y++)
 	{
-		for (int x = 0; x < terrainSize / (sideLength - 1); x++)
+		for (int x = 0; x < terrainSizeWidth / (sideLength - 1); x++)
 		{
 			// Top
 			average(x * (sideLength - 1) + halfLength, y * (sideLength - 1), sideLength);
@@ -797,12 +803,12 @@ void average(int x, int y, int sideLength)
 		counter += 1.0f;
 		accumulator += map[y - halfSide][x];
 	}
-	if (x != terrainSize - 1)
+	if (x != terrainSizeWidth - 1)
 	{
 		counter += 1.0f;
 		accumulator += map[y][x + halfSide];
 	}
-	if (y != terrainSize - 1)
+	if (y != terrainSizeHeight - 1)
 	{
 		counter += 1.0f;
 		accumulator += map[y + halfSide][x];
@@ -811,24 +817,19 @@ void average(int x, int y, int sideLength)
 	map[y][x] = (accumulator / counter) + rand() % roughness + -roughness;
 }
 
-void print_map()
-{
-	for (int i = 0; i < terrainSize; i++)
-	{
-		for (int j = 0; j < terrainSize; j++)
-		{
-			std::cout << map[i][j];
-		}
-		std::cout << std::endl;
-	}
-}
-
 void GenerationDiamondSquare()
 {
-	int sideLength = terrainSize / 2;
+	srand(randomSeed);
 
-	DiamondStep(terrainSize);
-	SquareStep(terrainSize);
+	int sideLength = terrainSizeWidth / 2;
+
+	map[0][0] = rand() % roughness + -roughness;
+	map[0][sideLength - 1] = rand() % roughness + -roughness;
+	map[sideLength - 1][0] = rand() % roughness + -roughness;
+	map[sideLength - 1][sideLength - 1] = rand() % roughness + -roughness;
+
+	DiamondStep(terrainSizeWidth);
+	SquareStep(terrainSizeWidth);
 
 	roughness /= 2;
 
@@ -843,18 +844,15 @@ void GenerationDiamondSquare()
 			roughness /= 2;
 		}
 	}
-
-	print_map();
 }
-
 
 HRESULT CreateTerrainGridHM()
 {
 	HRESULT hr;
 
 	// Grid Generation
-	rows = terrainSize;
-	columns = terrainSize;
+	rows = terrainSizeWidth;
+	columns = terrainSizeHeight;
 
 	float halfDepth = 0.5f * columns;
 	float halfWidth = 0.5f * rows;
@@ -953,8 +951,8 @@ HRESULT CreateTerrainDiamondSquare()
 	GenerationDiamondSquare();
 
 	// Grid Generation
-	rows = terrainSize;
-	columns = terrainSize;
+	rows = terrainSizeWidth;
+	columns = terrainSizeHeight;
 
 	float halfDepth = 0.5f * columns;
 	float halfWidth = 0.5f * rows;
@@ -1046,6 +1044,147 @@ HRESULT CreateTerrainDiamondSquare()
 	return hr;
 }
 
+HRESULT CreateTerrainFaultFormation()
+{
+	HRESULT hr;
+
+	srand(randomSeed);
+
+	float xLine1, yLine1, xLine2, yLine2;
+
+	float m = 0.0f, b = 0.0f;
+
+	xLine1 = terrainSizeWidth * 0.1f + rand() % terrainSizeWidth * 0.8f;
+	yLine1 = (rand() % 2 == 0) ? terrainSizeHeight - 1 : 0;
+
+	float randomPoint1 = 0;
+
+	while (randomPoint1 == 0)
+	{
+		randomPoint1 = rand() % roughness + -roughness;
+		xLine2 = xLine1 + randomPoint1;
+	}
+
+	float randomPoint2 = 0;
+	while (randomPoint2 == 0)
+	{
+		randomPoint2 = rand() % roughness + -roughness;
+		yLine2 = yLine1 + randomPoint2;
+	}
+
+	m = (yLine2 - yLine1) / (xLine2 - xLine1);
+	b = yLine1 - (xLine1 * m);
+
+	float H1 = rand() % roughness + -roughness;
+
+	float H2 = H1 * 0.5f;
+
+	// Grid Generation
+	rows = terrainSizeWidth;
+	columns = terrainSizeHeight;
+
+	float halfDepth = 0.5f * columns;
+	float halfWidth = 0.5f * rows;
+
+	rows = rows - 1;
+	columns = columns - 1;
+	totalCells = rows * columns;
+	totalFaces = rows * columns * 2;
+	totalVertices = rows * columns;
+
+	dx = rows / columns;
+	dz = columns / rows;
+
+	du = 1.0f / columns;
+	dv = 1.0f / rows;
+
+	std::vector<SimpleVertex> v(totalVertices);
+
+	int index;
+	float y = 0.0f;
+	// Vertex Generation
+	for (UINT i = 0; i < rows; ++i)
+	{
+		float z = halfDepth - i * dz;
+		for (UINT j = 0; j < columns; ++j)
+		{
+			float x = j * dx + -dx * 0.5;
+
+			y = 0.0f;
+
+			bool eq = j > i * m + b;
+
+			if (eq)
+			{
+				y += H1;
+			}
+
+			y -= H2;
+
+			v[i * columns + j].Pos = XMFLOAT3(x, y, z);
+			v[i * columns + j].Normal = XMFLOAT3(0.0f, 1.0f, 0.0f);
+
+			v[i * columns + j].TexCoord.x = j * du;
+			v[i * columns + j].TexCoord.y = i * dv;
+		}
+	}
+
+	std::vector<WORD> indices(totalFaces * 3);
+
+	int k = 0;
+	// Index Generation
+	for (UINT i = 0; i < rows - 1; ++i)
+	{
+		for (UINT j = 0; j < columns - 1; ++j)
+		{
+			indices[k] = i * columns + j;
+			indices[k + 1] = i * columns + j + 1;
+			indices[k + 2] = (i + 1) * columns + j;
+			indices[k + 3] = (i + 1) * columns + j;
+			indices[k + 4] = i * columns + j + 1;
+			indices[k + 5] = (i + 1) * columns + j + 1;
+
+			k += 6;
+		}
+	}
+
+	// Vertex Buffer
+	D3D11_BUFFER_DESC bd;
+	ZeroMemory(&bd, sizeof(bd));
+	bd.Usage = D3D11_USAGE_DEFAULT;
+	bd.ByteWidth = sizeof(SimpleVertex) * totalVertices;
+	bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	bd.CPUAccessFlags = 0;
+
+	D3D11_SUBRESOURCE_DATA InitData;
+	ZeroMemory(&InitData, sizeof(InitData));
+	InitData.pSysMem = v.data();
+	hr = g_pd3dDevice->CreateBuffer(&bd, &InitData, &g_pGridFFVertexBuffer);
+
+	if (FAILED(hr))
+		return hr;
+
+	// Index Buffer
+	D3D11_BUFFER_DESC bd2;
+	ZeroMemory(&bd2, sizeof(bd2));
+
+	bd2.Usage = D3D11_USAGE_DEFAULT;
+	bd2.ByteWidth = sizeof(WORD) * indices.size();
+	bd2.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	bd2.CPUAccessFlags = 0;
+
+	D3D11_SUBRESOURCE_DATA InitData2;
+	ZeroMemory(&InitData2, sizeof(InitData2));
+	InitData2.pSysMem = indices.data();
+	hr = g_pd3dDevice->CreateBuffer(&bd2, &InitData2, &g_pGridFFIndexBuffer);
+
+	if (FAILED(hr))
+		return hr;
+
+
+	return hr;
+}
+
 void setupLightForRender()
 {
 	Light light;
@@ -1079,7 +1218,11 @@ void Update()
 	g_pCurrentCamera->SetProjection();
 	g_pCurrentCamera->SetProjectionView();
 
-	XMStoreFloat4x4(&g_Terrian, XMMatrixTranslation(terrainPos.x, terrainPos.y, terrainPos.z));
+	XMMATRIX object;
+	object = (XMMatrixRotationX(terrainRot.x) * XMMatrixRotationY(terrainRot.y) * XMMatrixRotationZ(terrainRot.z)) * XMMatrixTranslation(terrainPos.x, terrainPos.y, terrainPos.z);
+
+
+	XMStoreFloat4x4(&g_Terrian, object);
 }
 
 void KeyboardInput()
@@ -1206,6 +1349,7 @@ void ImGuiRender()
 	{
 
 		ImGui::DragFloat3("Terain Position", &terrainPos.x);
+		ImGui::DragFloat3("Terain Rotation", &terrainRot.x, 0.01f);
 		ImGui::DragFloat("Terrain Height", &terrainHeight);
 		ImGui::DragFloat("Terrain Bias", &terrainBias);
 
@@ -1223,17 +1367,22 @@ void ImGuiRender()
 		if (ImGui::CollapsingHeader("Procedural Terrain"))
 		{
 			ImGui::DragInt("Terrain Seed: ", &randomSeed);
-			ImGui::DragInt("Roughness", &imGUIRoughness, 1.0f, 1.0f);
+			ImGui::DragInt("Roughness", &imGUIRoughness, 1.0f, 1.0f, 1000.0f);
 
 			ImGui::Checkbox("Diamond Square Algorithm", &diamondSquare);
-			if (ImGui::Button("Generate Diamond Square") && diamondSquare == true)
+			if (ImGui::Button("Generate Diamond Square") && diamondSquare == true && faultFormation == false)
 			{
 				roughness = imGUIRoughness;
 				CreateTerrainDiamondSquare();
 			}
+			ImGui::Checkbox("Fault Formation Algorithm", &faultFormation);
+			if (ImGui::Button("Generate Fault Formation") && faultFormation == true && diamondSquare == false)
+			{
+				roughness = imGUIRoughness;
+				CreateTerrainFaultFormation();
+			}
+
 		}
-
-
 	}
 	ImGui::End();
 	ImGui::Render();
@@ -1272,10 +1421,19 @@ void Render()
 
 	setupLightForRender();
 
+
+
+
+
 	if (diamondSquare == true)
 	{
 		g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pGridDSVertexBuffer, &stride, &offset);
 		g_pImmediateContext->IASetIndexBuffer(g_pGridDSIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+	}
+	else if (faultFormation == true)
+	{
+		g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pGridFFVertexBuffer, &stride, &offset);
+		g_pImmediateContext->IASetIndexBuffer(g_pGridFFIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
 	}
 	else
 	{

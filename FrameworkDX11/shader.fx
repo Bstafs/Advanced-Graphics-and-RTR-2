@@ -109,6 +109,7 @@ struct PS_INPUT
 	float4 worldPos : POSITION;
 	float3 Norm : NORMAL;
 	float2 Tex : TEXCOORD0;
+	float terrainHeight : TERRAIN_HEIGHT;
 };
 
 struct HS_CONSTANT_DATA_OUTPUT
@@ -265,12 +266,15 @@ PS_INPUT DSMAIN(HS_CONSTANT_DATA_OUTPUT input, float3 barycentrucCoords : SV_Dom
 
 	float fDisplacement = txDisplacementMap.SampleLevel(samLinear, output.Tex.xy, 0.0f).r;
 
+	output.terrainHeight = fDisplacement;
+
 	fDisplacement *= terrainHeight;
 	fDisplacement += terrainBias;
 
+
 	float3 vDirection = -output.Norm;
 
-	if(terrainID == 1)
+	if (terrainID == 1)
 	{
 		worldPos += vDirection * fDisplacement;
 	}
@@ -288,11 +292,17 @@ PS_INPUT DSMAIN(HS_CONSTANT_DATA_OUTPUT input, float3 barycentrucCoords : SV_Dom
 // Pixel Shader
 //--------------------------------------------------------------------------------------
 
+
+
 float4 PS(PS_INPUT IN) : SV_TARGET
 {
 	LightingResult lit = ComputeLighting(IN.worldPos, normalize(IN.Norm));
 
-	float4 texColor = { 1, 1, 1, 1 };
+	float4 texColor = { 1, 0, 1, 1 };
+
+	float4 grassColor = txGrass.Sample(samLinear, IN.Tex);
+	float4 rockColor = txStone.Sample(samLinear, IN.Tex);
+	float4 snowColor = txSnow.Sample(samLinear, IN.Tex);
 
 	float4 emissive = Material.Emissive;
 	float4 ambient = Material.Ambient * GlobalAmbient;
@@ -301,7 +311,32 @@ float4 PS(PS_INPUT IN) : SV_TARGET
 
 	if (Material.UseTexture)
 	{
-		texColor = txGrass.Sample(samLinear, IN.Tex);
+		if (IN.terrainHeight < 0.3f)
+		{
+			// 0.0 - 0.3 = Grass
+		  texColor = grassColor;
+		}
+		else if(IN.terrainHeight < 0.5f)
+		{
+			// 0.3 - 0.5 = grass -> rock
+			texColor = lerp(grassColor, rockColor, (IN.terrainHeight - 0.3) / 0.2);
+		}
+		else if (IN.terrainHeight < 0.7f)
+		{
+			// 0.5 - 0.7 = Rock
+			texColor = rockColor;
+		}
+		else if(IN.terrainHeight < 0.8f)
+		{
+			// 0.7 - 0.8 = Rock -> snow
+			texColor = lerp(rockColor, snowColor, (IN.terrainHeight - 0.7) / 0.1);
+		}
+		else
+		{
+			// 0.7 - 1.0 = Snow
+			texColor = snowColor;
+		}
+
 	}
 
 	float4 finalColor = (emissive + ambient + diffuse + specular) * texColor;
