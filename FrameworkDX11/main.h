@@ -31,8 +31,8 @@ using namespace std;
 
 typedef vector<DrawableGameObject*> vecDrawables;
 
-const int terrainSizeHeight = 65;
-const int terrainSizeWidth = 65;
+const int terrainSizeHeight = 33;
+const int terrainSizeWidth = 33;
 
 int roughness = 5;
 

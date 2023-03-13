@@ -137,6 +137,8 @@ bool diamondSquare = false;
 bool faultFormation = false;
 int randomSeed = 100;
 
+int faultIterations = 10;
+
 int imGUIRoughness = 15;
 
 
@@ -1049,36 +1051,6 @@ HRESULT CreateTerrainFaultFormation()
 	HRESULT hr;
 
 	srand(randomSeed);
-
-	float xLine1, yLine1, xLine2, yLine2;
-
-	float m = 0.0f, b = 0.0f;
-
-	xLine1 = terrainSizeWidth * 0.1f + rand() % terrainSizeWidth * 0.8f;
-	yLine1 = (rand() % 2 == 0) ? terrainSizeHeight - 1 : 0;
-
-	float randomPoint1 = 0;
-
-	while (randomPoint1 == 0)
-	{
-		randomPoint1 = rand() % roughness + -roughness;
-		xLine2 = xLine1 + randomPoint1;
-	}
-
-	float randomPoint2 = 0;
-	while (randomPoint2 == 0)
-	{
-		randomPoint2 = rand() % roughness + -roughness;
-		yLine2 = yLine1 + randomPoint2;
-	}
-
-	m = (yLine2 - yLine1) / (xLine2 - xLine1);
-	b = yLine1 - (xLine1 * m);
-
-	float H1 = rand() % roughness + -roughness;
-
-	float H2 = H1 * 0.5f;
-
 	// Grid Generation
 	rows = terrainSizeWidth;
 	columns = terrainSizeHeight;
@@ -1108,24 +1080,58 @@ HRESULT CreateTerrainFaultFormation()
 		float z = halfDepth - i * dz;
 		for (UINT j = 0; j < columns; ++j)
 		{
-			float x = j * dx + -dx * 0.5;
 
-			y = 0.0f;
-
-			bool eq = j > i * m + b;
-
-			if (eq)
+			for (int iter = 0; iter < faultIterations; ++iter)
 			{
-				y += H1;
+				float xLine1, yLine1, xLine2, yLine2;
+
+				float m = 0.0f, b = 0.0f;
+
+				xLine1 = terrainSizeWidth * 0.1f + rand() % terrainSizeWidth * 0.8f;
+				yLine1 = (rand() % 2 == 0) ? terrainSizeHeight - 1 : 0;
+
+				float randomPoint1 = 0;
+
+				while (randomPoint1 == 0.0f || xLine2 == xLine1)
+				{
+					randomPoint1 = rand() % roughness + -roughness;
+					xLine2 = xLine1 + randomPoint1;
+				}
+
+				float randomPoint2 = 0;
+				while (randomPoint2 == 0.0f)
+				{
+					randomPoint2 = rand() % roughness + -roughness;
+					yLine2 = yLine1 + randomPoint2;
+				}
+
+				m = (yLine2 - yLine1) / (xLine2 - xLine1);
+				b = yLine1 - (xLine1 * m);
+
+				float H1 = rand() % roughness + -roughness;
+
+				float H2 = H1 * 0.5f;
+
+
+				float x = j * dx + -dx * 0.5;
+
+				y = 0.0f;
+
+				bool eq = j > i * m + b;
+
+				if (eq)
+				{
+					y += H1;
+				}
+
+				y -= H2;
+
+				v[i * columns + j].Pos = XMFLOAT3(x, y, z);
+				v[i * columns + j].Normal = XMFLOAT3(0.0f, 1.0f, 0.0f);
+
+				v[i * columns + j].TexCoord.x = j * du;
+				v[i * columns + j].TexCoord.y = i * dv;
 			}
-
-			y -= H2;
-
-			v[i * columns + j].Pos = XMFLOAT3(x, y, z);
-			v[i * columns + j].Normal = XMFLOAT3(0.0f, 1.0f, 0.0f);
-
-			v[i * columns + j].TexCoord.x = j * du;
-			v[i * columns + j].TexCoord.y = i * dv;
 		}
 	}
 
@@ -1376,6 +1382,7 @@ void ImGuiRender()
 				CreateTerrainDiamondSquare();
 			}
 			ImGui::Checkbox("Fault Formation Algorithm", &faultFormation);
+			ImGui::DragInt("Fault Iterations", &faultIterations);
 			if (ImGui::Button("Generate Fault Formation") && faultFormation == true && diamondSquare == false)
 			{
 				roughness = imGUIRoughness;
