@@ -272,7 +272,7 @@ PS_INPUT DSMAIN(HS_CONSTANT_DATA_OUTPUT input, float3 barycentrucCoords : SV_Dom
 	fDisplacement += terrainBias;
 
 
-	float3 vDirection = -output.Norm;
+	float3 vDirection = output.Norm;
 
 	if (terrainID == 1)
 	{

@@ -1,5 +1,7 @@
 #pragma once
 
+#define STB_IMAGE_IMPLEMENTATION
+
 #include <windows.h>
 #include <windowsx.h>
 #include <d3d11_1.h>
@@ -27,12 +29,20 @@
 
 #include "Terrain.h"
 
+#include "stb_image.h"
+
+#include <noise/noise.h>
+#include  "noiseutils.h"
+
 using namespace std;
+using namespace noise;
 
 typedef vector<DrawableGameObject*> vecDrawables;
 
-const int terrainSizeHeight = 33;
-const int terrainSizeWidth = 33;
+
+
+const int terrainSizeHeight = 65;
+const int terrainSizeWidth = 65;
 
 int roughness = 5;
 

@@ -34,6 +34,7 @@ void Update();
 HRESULT CreateTerrainGridHM();
 HRESULT CreateTerrainDiamondSquare();
 HRESULT CreateTerrainFaultFormation();
+HRESULT CreateTerrainPerlinNoise();
 
 void DiamondStep(int sideLength);
 void SquareStep(int sideLength);
@@ -81,6 +82,9 @@ ID3D11Buffer* g_pGridDSIndexBuffer = nullptr;
 ID3D11Buffer* g_pGridFFVertexBuffer = nullptr;
 ID3D11Buffer* g_pGridFFIndexBuffer = nullptr;
 
+ID3D11Buffer* g_pGridPNVertexBuffer = nullptr;
+ID3D11Buffer* g_pGridPNIndexBuffer = nullptr;
+
 ID3D11Buffer* g_pTerrainMaterialBuffer = nullptr;
 MaterialPropertiesConstantBuffer	m_material;
 
@@ -125,16 +129,18 @@ ID3D11ShaderResourceView* g_pTextureGrass = nullptr;
 ID3D11ShaderResourceView* g_pTextureStone = nullptr;
 ID3D11ShaderResourceView* g_pTextureSnow = nullptr;
 ID3D11ShaderResourceView* g_pDispacementMap = nullptr;
+ID3D11ShaderResourceView* g_pHeightMap = nullptr;
 
 XMFLOAT3 terrainPos = XMFLOAT3(0.0f, -5.0f, 0.0f);
 XMFLOAT3 terrainRot = XMFLOAT3(0.0f, 0.0f, 0.0f);
 
 int terrainID;
 float terrainHeight = 4.0f;
-float terrainBias = 0.0f;
+float terrainBias = 5.0f;
 
 bool diamondSquare = false;
 bool faultFormation = false;
+bool perlinNoise = false;
 int randomSeed = 100;
 
 int faultIterations = 10;
@@ -480,6 +486,7 @@ HRESULT InitDevice()
 	hr = CreateDDSTextureFromFile(g_pd3dDevice, L"snow.dds", nullptr, &g_pTextureSnow);
 	hr = CreateDDSTextureFromFile(g_pd3dDevice, L"HeightMap.dds", nullptr, &g_pDispacementMap);
 
+
 	hr = InitMesh();
 	if (FAILED(hr))
 	{
@@ -646,6 +653,7 @@ HRESULT		InitWorld(int width, int height)
 	CreateTerrainGridHM();
 	CreateTerrainDiamondSquare();
 	CreateTerrainFaultFormation();
+	CreateTerrainPerlinNoise();
 
 	return S_OK;
 }
@@ -757,6 +765,11 @@ void DiamondStep(int sideLength)
 				map[x * (sideLength - 1)][(y + 1) * (sideLength - 1)] +
 				map[(x + 1) * (sideLength - 1)][y * (sideLength - 1)] +
 				map[(x + 1) * (sideLength - 1)][(y + 1) * (sideLength - 1)]) / 4.0f;
+
+			if (roughness >= 2)
+			{
+				roughness /= 2;
+			}
 
 			map[center_x][center_y] = avg + rand() % roughness + -roughness;
 		}
@@ -1080,7 +1093,7 @@ HRESULT CreateTerrainFaultFormation()
 		float z = halfDepth - i * dz;
 		for (UINT j = 0; j < columns; ++j)
 		{
-
+			float x = j * dx + -dx * 0.5;
 			for (int iter = 0; iter < faultIterations; ++iter)
 			{
 				float xLine1, yLine1, xLine2, yLine2;
@@ -1112,9 +1125,6 @@ HRESULT CreateTerrainFaultFormation()
 
 				float H2 = H1 * 0.5f;
 
-
-				float x = j * dx + -dx * 0.5;
-
 				y = 0.0f;
 
 				bool eq = j > i * m + b;
@@ -1125,13 +1135,13 @@ HRESULT CreateTerrainFaultFormation()
 				}
 
 				y -= H2;
-
-				v[i * columns + j].Pos = XMFLOAT3(x, y, z);
-				v[i * columns + j].Normal = XMFLOAT3(0.0f, 1.0f, 0.0f);
-
-				v[i * columns + j].TexCoord.x = j * du;
-				v[i * columns + j].TexCoord.y = i * dv;
 			}
+			v[i * columns + j].Pos = XMFLOAT3(x, y, z);
+			v[i * columns + j].Normal = XMFLOAT3(0.0f, 1.0f, 0.0f);
+
+			v[i * columns + j].TexCoord.x = j * du;
+			v[i * columns + j].TexCoord.y = i * dv;
+
 		}
 	}
 
@@ -1190,6 +1200,213 @@ HRESULT CreateTerrainFaultFormation()
 
 	return hr;
 }
+
+HRESULT CreateTerrainPerlinNoise()
+{
+	HRESULT hr;
+
+	srand(randomSeed);
+
+	// Randomize the Mountains
+	module::RidgedMulti mountainTerrain;
+	mountainTerrain.SetFrequency(rand() % roughness + -roughness);
+
+	// Randomize the Floor
+	module::Billow baseFlatTerrain;
+	baseFlatTerrain.SetFrequency(rand() % roughness + -roughness);
+
+	module::ScaleBias flatTerrain;
+	flatTerrain.SetSourceModule(0, baseFlatTerrain);
+	// Dont Touch
+	flatTerrain.SetScale(0.125);
+	flatTerrain.SetBias(-0.75);
+
+	module::Perlin terrainType;
+	terrainType.SetFrequency(rand() % 32 + 1);
+	terrainType.SetPersistence(0.25);
+
+	module::Select terrainSelector;
+	terrainSelector.SetSourceModule(0, flatTerrain);
+	terrainSelector.SetSourceModule(1, mountainTerrain);
+	terrainSelector.SetControlModule(terrainType);
+	terrainSelector.SetBounds(0.0, 10000.0);
+	terrainSelector.SetEdgeFalloff(0.125);
+
+	// Dont touch for now
+	module::Turbulence finalTerrain;
+	finalTerrain.SetSourceModule(0, terrainSelector);
+	finalTerrain.SetFrequency(4.0);
+	finalTerrain.SetPower(0.125);
+
+	utils::NoiseMap heightMap;
+	utils::NoiseMapBuilderPlane heightMapBuilder;
+	heightMapBuilder.SetSourceModule(finalTerrain);
+	heightMapBuilder.SetDestNoiseMap(heightMap);
+	heightMapBuilder.SetDestSize(terrainSizeWidth, terrainSizeHeight);
+	heightMapBuilder.SetBounds(6.0, 10.0, 1.0, 5.0);
+	heightMapBuilder.Build();
+
+	utils::RendererImage renderer;
+	utils::Image image;
+	renderer.SetSourceNoiseMap(heightMap);
+	renderer.SetDestImage(image);
+	renderer.ClearGradient();
+	renderer.AddGradientPoint(-1.00, utils::Color(32, 160, 0, 255)); // grass
+	renderer.AddGradientPoint(-0.25, utils::Color(224, 224, 0, 255)); // dirt
+	renderer.AddGradientPoint(0.25, utils::Color(128, 128, 128, 255)); // rock
+	renderer.AddGradientPoint(1.00, utils::Color(255, 255, 255, 255)); // snow
+	renderer.EnableLight();
+	renderer.SetLightContrast(3.0);
+	renderer.SetLightBrightness(2.0);
+	renderer.Render();
+
+	utils::WriterBMP writer;
+	writer.SetSourceImage(image);
+	writer.SetDestFilename("FinalHeightMap.bmp");
+	writer.WriteDestFile();
+
+	int ImageWidth;
+	int ImageHeight;
+	int imageChannels;
+	int imageDesiredChannels = 4;
+
+	unsigned char* imageData = stbi_load("FinalHeightMap.bmp", &ImageWidth, &ImageHeight, &imageChannels, imageDesiredChannels);
+
+	assert(imageData);
+
+	int imagePitch = ImageWidth * 4;
+
+	// Texture
+
+	D3D11_TEXTURE2D_DESC ImageTextureDesc = {};
+
+	ImageTextureDesc.Width = ImageWidth;
+	ImageTextureDesc.Height = ImageHeight;
+	ImageTextureDesc.MipLevels = 1;
+	ImageTextureDesc.ArraySize = 1;
+	ImageTextureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+	ImageTextureDesc.SampleDesc.Count = 1;
+	ImageTextureDesc.SampleDesc.Quality = 0;
+	ImageTextureDesc.Usage = D3D11_USAGE_IMMUTABLE;
+	ImageTextureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+	D3D11_SUBRESOURCE_DATA ImageSubresourceData = {};
+
+	ImageSubresourceData.pSysMem = imageData;
+	ImageSubresourceData.SysMemPitch = imagePitch;
+
+	ID3D11Texture2D* ImageTexture;
+
+	hr = g_pd3dDevice->CreateTexture2D(&ImageTextureDesc,
+		&ImageSubresourceData,
+		&ImageTexture
+	);
+
+	assert(SUCCEEDED(hr));
+
+	free(imageData);
+
+	hr = g_pd3dDevice->CreateShaderResourceView(ImageTexture, nullptr, &g_pHeightMap);
+	assert(SUCCEEDED(hr));
+
+	// Grid Generation
+	rows = terrainSizeWidth;
+	columns = terrainSizeHeight;
+
+	float halfDepth = 0.5f * columns;
+	float halfWidth = 0.5f * rows;
+
+	rows = rows - 1;
+	columns = columns - 1;
+	totalCells = rows * columns;
+	totalFaces = rows * columns * 2;
+	totalVertices = rows * columns;
+
+	dx = rows / columns;
+	dz = columns / rows;
+
+	du = 1.0f / columns;
+	dv = 1.0f / rows;
+
+	std::vector<SimpleVertex> v(totalVertices);
+
+	// Vertex Generation
+	for (UINT i = 0; i < rows; ++i)
+	{
+		float z = halfDepth - i * dz;
+		for (UINT j = 0; j < columns; ++j)
+		{
+			for (int iter = 0; iter < faultIterations; ++iter)
+			{
+				float x = j * dx + -dx * 0.5;
+				float y = 0.0f;
+
+				v[i * columns + j].Pos = XMFLOAT3(x, y, z);
+				v[i * columns + j].Normal = XMFLOAT3(0.0f, 1.0f, 0.0f);
+
+				v[i * columns + j].TexCoord.x = j * du;
+				v[i * columns + j].TexCoord.y = i * dv;
+			}
+
+		}
+	}
+
+	std::vector<WORD> indices(totalFaces * 3);
+
+	int k = 0;
+	// Index Generation
+	for (UINT i = 0; i < rows - 1; ++i)
+	{
+		for (UINT j = 0; j < columns - 1; ++j)
+		{
+			indices[k] = i * columns + j;
+			indices[k + 1] = i * columns + j + 1;
+			indices[k + 2] = (i + 1) * columns + j;
+			indices[k + 3] = (i + 1) * columns + j;
+			indices[k + 4] = i * columns + j + 1;
+			indices[k + 5] = (i + 1) * columns + j + 1;
+
+			k += 6;
+		}
+	}
+
+	// Vertex Buffer
+	D3D11_BUFFER_DESC bd;
+	ZeroMemory(&bd, sizeof(bd));
+	bd.Usage = D3D11_USAGE_DEFAULT;
+	bd.ByteWidth = sizeof(SimpleVertex) * totalVertices;
+	bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	bd.CPUAccessFlags = 0;
+
+	D3D11_SUBRESOURCE_DATA InitData;
+	ZeroMemory(&InitData, sizeof(InitData));
+	InitData.pSysMem = v.data();
+	hr = g_pd3dDevice->CreateBuffer(&bd, &InitData, &g_pGridPNVertexBuffer);
+
+	if (FAILED(hr))
+		return hr;
+
+	// Index Buffer
+	D3D11_BUFFER_DESC bd2;
+	ZeroMemory(&bd2, sizeof(bd2));
+
+	bd2.Usage = D3D11_USAGE_DEFAULT;
+	bd2.ByteWidth = sizeof(WORD) * indices.size();
+	bd2.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	bd2.CPUAccessFlags = 0;
+
+	D3D11_SUBRESOURCE_DATA InitData2;
+	ZeroMemory(&InitData2, sizeof(InitData2));
+	InitData2.pSysMem = indices.data();
+	hr = g_pd3dDevice->CreateBuffer(&bd2, &InitData2, &g_pGridPNIndexBuffer);
+
+	if (FAILED(hr))
+		return hr;
+
+
+	return hr;
+}
+
 
 void setupLightForRender()
 {
@@ -1376,18 +1593,31 @@ void ImGuiRender()
 			ImGui::DragInt("Roughness", &imGUIRoughness, 1.0f, 1.0f, 1000.0f);
 
 			ImGui::Checkbox("Diamond Square Algorithm", &diamondSquare);
-			if (ImGui::Button("Generate Diamond Square") && diamondSquare == true && faultFormation == false)
+			if (ImGui::Button("Generate Diamond Square") && diamondSquare == true && faultFormation == false && perlinNoise == false)
 			{
+				randomSeed = rand() % 2147483647 + 0;
 				roughness = imGUIRoughness;
 				CreateTerrainDiamondSquare();
 			}
 			ImGui::Checkbox("Fault Formation Algorithm", &faultFormation);
 			ImGui::DragInt("Fault Iterations", &faultIterations);
-			if (ImGui::Button("Generate Fault Formation") && faultFormation == true && diamondSquare == false)
+			if (ImGui::Button("Generate Fault Formation") && faultFormation == true && diamondSquare == false && perlinNoise == false)
 			{
+				randomSeed = rand() % 2147483647 + 0;
 				roughness = imGUIRoughness;
+				roughness = rand() % 3 + 1;
 				CreateTerrainFaultFormation();
 			}
+			ImGui::Checkbox("Perlin Noise Algorithm", &perlinNoise);
+			if (ImGui::Button("Generate Perlin Noise") && perlinNoise == true && diamondSquare == false && faultFormation == false)
+			{
+				terrainID = 1;
+				terrainHeight = 2.0f;
+				randomSeed = rand() % 2147483647 + 0;
+				roughness = imGUIRoughness;
+				CreateTerrainPerlinNoise();
+			}
+
 
 		}
 	}
@@ -1428,10 +1658,6 @@ void Render()
 
 	setupLightForRender();
 
-
-
-
-
 	if (diamondSquare == true)
 	{
 		g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pGridDSVertexBuffer, &stride, &offset);
@@ -1441,6 +1667,11 @@ void Render()
 	{
 		g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pGridFFVertexBuffer, &stride, &offset);
 		g_pImmediateContext->IASetIndexBuffer(g_pGridFFIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+	}
+	else if (perlinNoise == true)
+	{
+		g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pGridPNVertexBuffer, &stride, &offset);
+		g_pImmediateContext->IASetIndexBuffer(g_pGridPNIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
 	}
 	else
 	{
@@ -1465,7 +1696,17 @@ void Render()
 	g_pImmediateContext->DSSetShader(g_pDomainShader, nullptr, 0);
 	g_pImmediateContext->DSSetConstantBuffers(0, 1, &g_pConstantBuffer);
 	g_pImmediateContext->DSSetSamplers(0, 1, &g_pSamplerState);
-	g_pImmediateContext->DSSetShaderResources(3, 1, &g_pDispacementMap);
+	g_pImmediateContext->DSSetShaderResources(3, 1, &g_pHeightMap);
+
+	if (perlinNoise == true)
+	{
+		g_pImmediateContext->DSSetShaderResources(3, 1, &g_pHeightMap);
+	}
+	else
+	{
+		g_pImmediateContext->DSSetShaderResources(3, 1, &g_pDispacementMap);
+	}
+
 
 	// Geometry Shader
 
@@ -1477,7 +1718,17 @@ void Render()
 	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureGrass);
 	g_pImmediateContext->PSSetShaderResources(1, 1, &g_pTextureStone);
 	g_pImmediateContext->PSSetShaderResources(2, 1, &g_pTextureSnow);
-	g_pImmediateContext->PSSetShaderResources(3, 1, &g_pDispacementMap);
+
+	if (perlinNoise == true)
+	{
+		g_pImmediateContext->PSSetShaderResources(3, 1, &g_pHeightMap);
+	}
+	else
+	{
+		g_pImmediateContext->PSSetShaderResources(3, 1, &g_pDispacementMap);
+	}
+
+
 	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerState);
 
 	g_pImmediateContext->DrawIndexed(totalFaces * 3, 0, 0);

@@ -30,6 +30,7 @@
     </ClCompile>
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Terrain.cpp" />
+    <ClCompile Include="noiseutils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DDSTextureLoader.h" />
@@ -63,12 +64,15 @@
     </ClInclude>
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Terrain.h" />
+    <ClInclude Include="noiseutils.h" />
+    <ClInclude Include="stb_image.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Tutorial01.rc" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="Resources\stone.dds" />
+    <Image Include="lightdirt.dds" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="imgui">
