@@ -31,6 +31,7 @@ public:
 	ID3D11Buffer*						getMaterialConstantBuffer() { return m_pMaterialConstantBuffer;}
 	void								setPosition(XMFLOAT3 position);
 
+	XMFLOAT3							m_position;
 private:
 	
 	XMFLOAT4X4							m_World;
@@ -41,6 +42,5 @@ private:
 	ID3D11SamplerState *				m_pSamplerLinear;
 	MaterialPropertiesConstantBuffer	m_material;
 	ID3D11Buffer*						m_pMaterialConstantBuffer = nullptr;
-	XMFLOAT3							m_position;
 };
 

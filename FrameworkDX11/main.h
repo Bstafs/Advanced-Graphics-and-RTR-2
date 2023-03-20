@@ -29,6 +29,8 @@
 
 #include "Terrain.h"
 
+#include "Skeleton.h"
+
 #include "stb_image.h"
 
 #include <noise/noise.h>

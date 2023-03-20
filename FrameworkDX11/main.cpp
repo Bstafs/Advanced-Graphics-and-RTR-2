@@ -16,18 +16,20 @@
 
 #include "main.h"
 
-DirectX::XMFLOAT4 g_EyePosition(0.0f, 0, -0, 1.0f);
+DirectX::XMFLOAT4 g_EyePosition(0.0f, 0, -3, 1.0f);
 XMFLOAT4 LightPosition(g_EyePosition);
 //--------------------------------------------------------------------------------------
 // Forward declarations
 //--------------------------------------------------------------------------------------
 HRESULT		InitWindow(HINSTANCE hInstance, int nCmdShow);
 HRESULT		InitDevice();
-HRESULT		InitMesh();
+HRESULT		InitMeshTerrain();
+HRESULT		InitMeshSMA();
 HRESULT		InitWorld(int width, int height);
 void		CleanupDevice();
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
-void		Render();
+void		RenderTerrain();
+void		RenderSMA();
 void KeyboardInput();
 void ImGuiRender();
 void Update();
@@ -73,6 +75,8 @@ ID3D11Buffer* g_pLightConstantBuffer = nullptr;
 ID3D11RasterizerState* g_pWireFrame;
 ID3D11SamplerState* g_pSamplerState = nullptr;
 
+
+// Terrain
 ID3D11Buffer* g_pGridVertexBuffer = nullptr;
 ID3D11Buffer* g_pGridIndexBuffer = nullptr;
 
@@ -87,6 +91,10 @@ ID3D11Buffer* g_pGridPNIndexBuffer = nullptr;
 
 ID3D11Buffer* g_pTerrainMaterialBuffer = nullptr;
 MaterialPropertiesConstantBuffer	m_material;
+
+// SMA
+ID3D11VertexShader* g_pSMAVertexShader;
+ID3D11PixelShader* g_pSMAPixelShader;
 
 // Camera
 XMMATRIX                g_View;
@@ -124,6 +132,9 @@ float dv;
 // Terrain Object
 XMFLOAT4X4 g_Terrian;
 
+// SMA Object
+XMFLOAT4X4 g_Character;
+
 // Terrain Textures
 ID3D11ShaderResourceView* g_pTextureGrass = nullptr;
 ID3D11ShaderResourceView* g_pTextureStone = nullptr;
@@ -146,6 +157,8 @@ int randomSeed = 100;
 int faultIterations = 10;
 
 int imGUIRoughness = 15;
+
+int terrainOrSMA = 1;
 
 
 //--------------------------------------------------------------------------------------
@@ -179,7 +192,25 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 		{
 			Update();
 			KeyboardInput();
-			Render();
+
+			switch (terrainOrSMA)
+			{
+			case 0:
+			{
+				RenderTerrain();
+				break;
+			}
+			case 1: 
+			{
+				RenderSMA();
+				break;
+			}
+			default:
+			{
+				RenderTerrain();
+				break;
+			}
+			}
 		}
 	}
 
@@ -487,7 +518,7 @@ HRESULT InitDevice()
 	hr = CreateDDSTextureFromFile(g_pd3dDevice, L"HeightMap.dds", nullptr, &g_pDispacementMap);
 
 
-	hr = InitMesh();
+	hr = InitMeshTerrain();
 	if (FAILED(hr))
 	{
 		MessageBox(nullptr,
@@ -514,7 +545,7 @@ HRESULT InitDevice()
 // InitMesh
 // ***************************************************************************************
 
-HRESULT		InitMesh()
+HRESULT		InitMeshTerrain()
 {
 	// Compile the vertex shader
 	ID3DBlob* pVSBlob = nullptr;
@@ -528,6 +559,24 @@ HRESULT		InitMesh()
 
 	// Create the vertex shader
 	hr = g_pd3dDevice->CreateVertexShader(pVSBlob->GetBufferPointer(), pVSBlob->GetBufferSize(), nullptr, &g_pVertexShader);
+	if (FAILED(hr))
+	{
+		pVSBlob->Release();
+		return hr;
+	}
+
+	// Compile the vertex shader
+	pVSBlob = nullptr;
+	hr = CompileShaderFromFile(L"shaderSMA.fx", "VS", "vs_5_0", &pVSBlob);
+	if (FAILED(hr))
+	{
+		MessageBox(nullptr,
+			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
+		return hr;
+	}
+
+	// Create the vertex shader
+	hr = g_pd3dDevice->CreateVertexShader(pVSBlob->GetBufferPointer(), pVSBlob->GetBufferSize(), nullptr, &g_pSMAVertexShader);
 	if (FAILED(hr))
 	{
 		pVSBlob->Release();
@@ -605,6 +654,21 @@ HRESULT		InitMesh()
 	if (FAILED(hr))
 		return hr;
 
+	// Compile the pixel shader
+	pPSBlob = nullptr;
+	hr = CompileShaderFromFile(L"shaderSMA.fx", "PS", "ps_4_0", &pPSBlob);
+	if (FAILED(hr))
+	{
+		MessageBox(nullptr,
+			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
+		return hr;
+	}
+
+	// Create the pixel shader
+	hr = g_pd3dDevice->CreatePixelShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), nullptr, &g_pSMAPixelShader);
+	pPSBlob->Release();
+	if (FAILED(hr))
+		return hr;
 
 	// Create the constant buffer
 	D3D11_BUFFER_DESC bd = {};
@@ -654,6 +718,11 @@ HRESULT		InitWorld(int width, int height)
 	CreateTerrainDiamondSquare();
 	CreateTerrainFaultFormation();
 	CreateTerrainPerlinNoise();
+
+	Skeleton* mySkeleton;
+
+
+
 
 	return S_OK;
 }
@@ -1407,7 +1476,6 @@ HRESULT CreateTerrainPerlinNoise()
 	return hr;
 }
 
-
 void setupLightForRender()
 {
 	Light light;
@@ -1443,7 +1511,6 @@ void Update()
 
 	XMMATRIX object;
 	object = (XMMatrixRotationX(terrainRot.x) * XMMatrixRotationY(terrainRot.y) * XMMatrixRotationZ(terrainRot.z)) * XMMatrixTranslation(terrainPos.x, terrainPos.y, terrainPos.z);
-
 
 	XMStoreFloat4x4(&g_Terrian, object);
 }
@@ -1570,6 +1637,10 @@ void ImGuiRender()
 	}
 	if (ImGui::CollapsingHeader("Terrain"))
 	{
+		if (ImGui::Button("Render Terrain"))
+		{
+			terrainOrSMA = 0;
+		}
 
 		ImGui::DragFloat3("Terain Position", &terrainPos.x);
 		ImGui::DragFloat3("Terain Rotation", &terrainRot.x, 0.01f);
@@ -1617,10 +1688,20 @@ void ImGuiRender()
 				roughness = imGUIRoughness;
 				CreateTerrainPerlinNoise();
 			}
-
-
 		}
 	}
+	if (ImGui::CollapsingHeader("Skinned Mesh Animation"))
+	{
+		if (ImGui::Button("Render SMA"))
+		{
+			terrainOrSMA = 1;
+		}
+
+		ImGui::DragFloat("ObjectPos", &g_GameObject.m_position.x);
+		ImGui::DragFloat("ObjectPos", &g_GameObject.m_position.y);
+		ImGui::DragFloat("ObjectPos", &g_GameObject.m_position.z);
+	}
+
 	ImGui::End();
 	ImGui::Render();
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
@@ -1630,13 +1711,13 @@ void ImGuiRender()
 //--------------------------------------------------------------------------------------
 // Render a frame
 //--------------------------------------------------------------------------------------
-void Render()
+void RenderTerrain()
 {
 	float t = calculateDeltaTime(); // capped at 60 fps
 	if (t == 0.0f)
 		return;
 
-	// Clear the back buffer
+	// Terrain
 	g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, Colors::MidnightBlue);
 	g_pImmediateContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
@@ -1740,5 +1821,50 @@ void Render()
 	g_pSwapChain->Present(0, 0);
 }
 
+void RenderSMA()
+{
+	float t = calculateDeltaTime(); // capped at 60 fps
+	if (t == 0.0f)
+		return;
+
+	// Clear the back buffer
+	g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, Colors::MidnightBlue);
+
+	// Clear the depth buffer to 1.0 (max depth)
+	g_pImmediateContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
+
+	// Update the cube transform, material etc. 
+	g_GameObject.update(t, g_pImmediateContext);
+
+	// get the game object world transform
+	XMMATRIX mGO = XMLoadFloat4x4(g_GameObject.getTransform());
+
+	// store this and the view / projection in a constant buffer for the vertex shader to use
+	ConstantBuffer cb1;
+	cb1.mWorld = XMMatrixTranspose(mGO);
+	cb1.mView = XMMatrixTranspose(XMLoadFloat4x4(g_pCurrentCamera->GetView()));
+	cb1.mProjection = XMMatrixTranspose(XMLoadFloat4x4(g_pCurrentCamera->GetProjection()));
+	cb1.vOutputColor = XMFLOAT4(0, 0, 0, 0);
+	g_pImmediateContext->UpdateSubresource(g_pConstantBuffer, 0, nullptr, &cb1, 0, 0);
+
+	setupLightForRender();
+
+	// Render the cube
+	g_pImmediateContext->VSSetShader(g_pSMAVertexShader, nullptr, 0);
+	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pConstantBuffer);
+
+	g_pImmediateContext->PSSetShader(g_pSMAPixelShader, nullptr, 0);
+	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pConstantBuffer);
+	g_pImmediateContext->PSSetConstantBuffers(2, 1, &g_pLightConstantBuffer);
+	ID3D11Buffer* materialCB = g_GameObject.getMaterialConstantBuffer();
+	g_pImmediateContext->PSSetConstantBuffers(1, 1, &materialCB);
+
+	g_GameObject.draw(g_pImmediateContext);
+
+	ImGuiRender();
+
+	// Present our back buffer to our front buffer
+	g_pSwapChain->Present(0, 0);
+}
 
 
