@@ -48,4 +48,4 @@ const int terrainSizeWidth = 65;
 
 int roughness = 5;
 
-int map[terrainSizeWidth][terrainSizeHeight];
+int terrainMap[terrainSizeWidth][terrainSizeHeight];

@@ -83,4 +83,7 @@
       <UniqueIdentifier>{3dcec7d1-a244-4745-ae39-e623782d94cd}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
+  <ItemGroup>
+    <Library Include="assimp\assimp-vc143-mtd.lib" />
+  </ItemGroup>
 </Project>

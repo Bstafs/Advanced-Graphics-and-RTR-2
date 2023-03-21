@@ -830,17 +830,17 @@ void DiamondStep(int sideLength)
 			int center_x = x * (sideLength - 1) + halfSide;
 			int center_y = y * (sideLength - 1) + halfSide;
 
-			int avg = (map[x * (sideLength - 1)][y * (sideLength - 1)] +
-				map[x * (sideLength - 1)][(y + 1) * (sideLength - 1)] +
-				map[(x + 1) * (sideLength - 1)][y * (sideLength - 1)] +
-				map[(x + 1) * (sideLength - 1)][(y + 1) * (sideLength - 1)]) / 4.0f;
+			int avg = (terrainMap[x * (sideLength - 1)][y * (sideLength - 1)] +
+				terrainMap[x * (sideLength - 1)][(y + 1) * (sideLength - 1)] +
+				terrainMap[(x + 1) * (sideLength - 1)][y * (sideLength - 1)] +
+				terrainMap[(x + 1) * (sideLength - 1)][(y + 1) * (sideLength - 1)]) / 4.0f;
 
 			if (roughness >= 2)
 			{
 				roughness /= 2;
 			}
 
-			map[center_x][center_y] = avg + rand() % roughness + -roughness;
+			terrainMap[center_x][center_y] = avg + rand() % roughness + -roughness;
 		}
 	}
 
@@ -880,25 +880,25 @@ void average(int x, int y, int sideLength)
 	if (x != 0)
 	{
 		counter += 1.0f;
-		accumulator += map[y][x - halfSide];
+		accumulator += terrainMap[y][x - halfSide];
 	}
 	if (y != 0)
 	{
 		counter += 1.0f;
-		accumulator += map[y - halfSide][x];
+		accumulator += terrainMap[y - halfSide][x];
 	}
 	if (x != terrainSizeWidth - 1)
 	{
 		counter += 1.0f;
-		accumulator += map[y][x + halfSide];
+		accumulator += terrainMap[y][x + halfSide];
 	}
 	if (y != terrainSizeHeight - 1)
 	{
 		counter += 1.0f;
-		accumulator += map[y + halfSide][x];
+		accumulator += terrainMap[y + halfSide][x];
 	}
 
-	map[y][x] = (accumulator / counter) + rand() % roughness + -roughness;
+	terrainMap[y][x] = (accumulator / counter) + rand() % roughness + -roughness;
 }
 
 void GenerationDiamondSquare()
@@ -907,10 +907,10 @@ void GenerationDiamondSquare()
 
 	int sideLength = terrainSizeWidth / 2;
 
-	map[0][0] = rand() % roughness + -roughness;
-	map[0][sideLength - 1] = rand() % roughness + -roughness;
-	map[sideLength - 1][0] = rand() % roughness + -roughness;
-	map[sideLength - 1][sideLength - 1] = rand() % roughness + -roughness;
+	terrainMap[0][0] = rand() % roughness + -roughness;
+	terrainMap[0][sideLength - 1] = rand() % roughness + -roughness;
+	terrainMap[sideLength - 1][0] = rand() % roughness + -roughness;
+	terrainMap[sideLength - 1][sideLength - 1] = rand() % roughness + -roughness;
 
 	DiamondStep(terrainSizeWidth);
 	SquareStep(terrainSizeWidth);
@@ -1062,7 +1062,7 @@ HRESULT CreateTerrainDiamondSquare()
 		for (UINT j = 0; j < columns; ++j)
 		{
 			float x = j * dx + (-dx * 0.5);
-			float y = map[i][j];
+			float y = terrainMap[i][j];
 
 			v[i * columns + j].Pos = XMFLOAT3(x, y, z);
 			v[i * columns + j].Normal = XMFLOAT3(0.0f, 1.0f, 0.0f);
