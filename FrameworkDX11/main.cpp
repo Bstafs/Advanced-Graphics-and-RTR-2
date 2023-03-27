@@ -1187,16 +1187,25 @@ HRESULT CreateTerrainFaultFormation()
 					yLine2 = yLine1 + randomPoint2;
 				}
 
-				m = (yLine2 - yLine1) / (xLine2 - xLine1);
-				b = yLine1 - (xLine1 * m);
+				// Using y = mx + b to get the slope intersect between two points
+				m = (yLine2 - yLine1) / (xLine2 - xLine1); // The slope of the line using the two random points on the terrain
+				b = yLine1 - (m * xLine1); // y-intercept
+
+				// Basically, m and b are constant values that are calculated to define the line between two random points.
+
+				y = 0.0f;
+
+				// i * m + b gives us the value of y on the line at the x coordinate of the current vertex that is generated on grid.
+				// Check if the x coordinate of the current vertex being generated on the grid is greater than the value of y from above.
+				// so using the m and b we can check is the current vertex(i) is above or below the line calculated at the x coordinate
+
+				bool eq = j > i * m + b; // Stored for a comparison to be reused by each two random points generated on the grid.
+
+				// if this is true, then add roughness, else you can do nothing or remove half of the roughness to y to add more depth to mountains.
 
 				float H1 = rand() % roughness + -roughness;
 
 				float H2 = H1 * 0.5f;
-
-				y = 0.0f;
-
-				bool eq = j > i * m + b;
 
 				if (eq)
 				{
