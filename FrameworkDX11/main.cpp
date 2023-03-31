@@ -154,7 +154,14 @@ bool faultFormation = false;
 bool perlinNoise = false;
 int randomSeed = 100;
 
+// Fault Formation
 int faultIterations = 10;
+
+// Controls the vertical displacement for the fault lines - higher means more variation 
+float faultAmplitude = 1.0f;
+
+// Width of the fault lines
+float faultWidth = 1.0f;
 
 int imGUIRoughness = 15;
 
@@ -200,7 +207,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 				RenderTerrain();
 				break;
 			}
-			case 1: 
+			case 1:
 			{
 				RenderSMA();
 				break;
@@ -972,7 +979,7 @@ HRESULT CreateTerrainGridHM()
 		}
 	}
 
-	std::vector<WORD> indices(totalFaces * 3);
+	std::vector<DWORD> indices(totalFaces * 3);
 
 	int k = 0;
 	// Index Generation
@@ -1012,7 +1019,7 @@ HRESULT CreateTerrainGridHM()
 	ZeroMemory(&bd2, sizeof(bd2));
 
 	bd2.Usage = D3D11_USAGE_DEFAULT;
-	bd2.ByteWidth = sizeof(WORD) * indices.size();
+	bd2.ByteWidth = sizeof(DWORD) * indices.size();
 	bd2.BindFlags = D3D11_BIND_INDEX_BUFFER;
 	bd2.CPUAccessFlags = 0;
 
@@ -1072,7 +1079,7 @@ HRESULT CreateTerrainDiamondSquare()
 		}
 	}
 
-	std::vector<WORD> indices(totalFaces * 3);
+	std::vector<DWORD> indices(totalFaces * 3);
 
 	int k = 0;
 	// Index Generation
@@ -1112,7 +1119,7 @@ HRESULT CreateTerrainDiamondSquare()
 	ZeroMemory(&bd2, sizeof(bd2));
 
 	bd2.Usage = D3D11_USAGE_DEFAULT;
-	bd2.ByteWidth = sizeof(WORD) * indices.size();
+	bd2.ByteWidth = sizeof(DWORD) * indices.size();
 	bd2.BindFlags = D3D11_BIND_INDEX_BUFFER;
 	bd2.CPUAccessFlags = 0;
 
@@ -1154,8 +1161,6 @@ HRESULT CreateTerrainFaultFormation()
 
 	std::vector<SimpleVertex> v(totalVertices);
 
-	int index;
-	float y = 0.0f;
 	// Vertex Generation
 	for (UINT i = 0; i < rows; ++i)
 	{
@@ -1163,56 +1168,31 @@ HRESULT CreateTerrainFaultFormation()
 		for (UINT j = 0; j < columns; ++j)
 		{
 			float x = j * dx + -dx * 0.5;
+
+			float y = 0.0f;
+
+			// Fault Line Algorithm Starts Here
 			for (int iter = 0; iter < faultIterations; ++iter)
 			{
-				float xLine1, yLine1, xLine2, yLine2;
+				// Calculate The Random Points on the grid Created
+				float xLine1 = terrainSizeWidth * 0.1f + rand() % terrainSizeWidth * 0.8f;
+				float yLine1 = (rand() % 2 == 0) ? terrainSizeHeight - 1 : 0;
 
-				float m = 0.0f, b = 0.0f;
+				float xLine2 = xLine1 + (rand() % roughness + -roughness);
+				float yLine2 = yLine1 + (rand() % roughness + -roughness);
 
-				xLine1 = terrainSizeWidth * 0.1f + rand() % terrainSizeWidth * 0.8f;
-				yLine1 = (rand() % 2 == 0) ? terrainSizeHeight - 1 : 0;
+				// Using y = mx + b to get the slope intersect between (Also known as creating the line between these two points)
+				float slope = (yLine2 - yLine1) / (xLine2 - xLine1); // The slope (m)
+				float yIntercept = yLine1 - (slope * xLine1); // The Y Intercept (b)
 
-				float randomPoint1 = 0;
+				//Calculate a distances from the current vertex on the grid to the fault line being created.
+				float distance = (j - xLine1) * (yLine2 - yLine1) - (i * dz - yLine1) * (xLine2 - xLine1);
 
-				while (randomPoint1 == 0.0f || xLine2 == xLine1)
-				{
-					randomPoint1 = rand() % roughness + -roughness;
-					xLine2 = xLine1 + randomPoint1;
-				}
+				// Calculating Height Based on Distance
+				float finalFaultHeight = faultAmplitude * max(0.0f, 1.0f - abs(distance) / faultWidth);
 
-				float randomPoint2 = 0;
-				while (randomPoint2 == 0.0f)
-				{
-					randomPoint2 = rand() % roughness + -roughness;
-					yLine2 = yLine1 + randomPoint2;
-				}
+				y += finalFaultHeight * (j > i * slope * yIntercept ? 1.0f : -1.0f);
 
-				// Using y = mx + b to get the slope intersect between two points
-				m = (yLine2 - yLine1) / (xLine2 - xLine1); // The slope of the line using the two random points on the terrain
-				b = yLine1 - (m * xLine1); // y-intercept
-
-				// Basically, m and b are constant values that are calculated to define the line between two random points.
-
-				y = 0.0f;
-
-				// i * m + b gives us the value of y on the line at the x coordinate of the current vertex that is generated on grid.
-				// Check if the x coordinate of the current vertex being generated on the grid is greater than the value of y from above.
-				// so using the m and b we can check is the current vertex(i) is above or below the line calculated at the x coordinate
-
-				bool eq = j > i * m + b; // Stored for a comparison to be reused by each two random points generated on the grid.
-
-				// if this is true, then add roughness, else you can do nothing or remove half of the roughness to y to add more depth to mountains.
-
-				float H1 = rand() % roughness + -roughness;
-
-				float H2 = H1 * 0.5f;
-
-				if (eq)
-				{
-					y += H1;
-				}
-
-				y -= H2;
 			}
 			v[i * columns + j].Pos = XMFLOAT3(x, y, z);
 			v[i * columns + j].Normal = XMFLOAT3(0.0f, 1.0f, 0.0f);
@@ -1223,7 +1203,7 @@ HRESULT CreateTerrainFaultFormation()
 		}
 	}
 
-	std::vector<WORD> indices(totalFaces * 3);
+	std::vector<DWORD> indices(totalFaces * 3);
 
 	int k = 0;
 	// Index Generation
@@ -1263,7 +1243,7 @@ HRESULT CreateTerrainFaultFormation()
 	ZeroMemory(&bd2, sizeof(bd2));
 
 	bd2.Usage = D3D11_USAGE_DEFAULT;
-	bd2.ByteWidth = sizeof(WORD) * indices.size();
+	bd2.ByteWidth = sizeof(DWORD) * indices.size();
 	bd2.BindFlags = D3D11_BIND_INDEX_BUFFER;
 	bd2.CPUAccessFlags = 0;
 
@@ -1429,7 +1409,7 @@ HRESULT CreateTerrainPerlinNoise()
 		}
 	}
 
-	std::vector<WORD> indices(totalFaces * 3);
+	std::vector<DWORD> indices(totalFaces * 3);
 
 	int k = 0;
 	// Index Generation
@@ -1469,7 +1449,7 @@ HRESULT CreateTerrainPerlinNoise()
 	ZeroMemory(&bd2, sizeof(bd2));
 
 	bd2.Usage = D3D11_USAGE_DEFAULT;
-	bd2.ByteWidth = sizeof(WORD) * indices.size();
+	bd2.ByteWidth = sizeof(DWORD) * indices.size();
 	bd2.BindFlags = D3D11_BIND_INDEX_BUFFER;
 	bd2.CPUAccessFlags = 0;
 
@@ -1653,7 +1633,10 @@ void ImGuiRender()
 
 		ImGui::DragFloat3("Terain Position", &terrainPos.x);
 		ImGui::DragFloat3("Terain Rotation", &terrainRot.x, 0.01f);
-		ImGui::DragFloat("Terrain Height", &terrainHeight);
+
+		ImGui::Text("Terrain Height: %d", terrainSizeHeight);
+		ImGui::Text("Terrain Width: %d", terrainSizeWidth);
+
 		ImGui::DragFloat("Terrain Bias", &terrainBias);
 
 		if (ImGui::CollapsingHeader("Static Terrain"))
@@ -1681,11 +1664,12 @@ void ImGuiRender()
 			}
 			ImGui::Checkbox("Fault Formation Algorithm", &faultFormation);
 			ImGui::DragInt("Fault Iterations", &faultIterations);
+			ImGui::DragFloat("Fault Width", &faultWidth);
+			ImGui::DragFloat("Fault Amplitude", &faultAmplitude);
 			if (ImGui::Button("Generate Fault Formation") && faultFormation == true && diamondSquare == false && perlinNoise == false)
 			{
 				randomSeed = rand() % 2147483647 + 0;
 				roughness = imGUIRoughness;
-				roughness = rand() % 3 + 1;
 				CreateTerrainFaultFormation();
 			}
 			ImGui::Checkbox("Perlin Noise Algorithm", &perlinNoise);
@@ -1751,22 +1735,22 @@ void RenderTerrain()
 	if (diamondSquare == true)
 	{
 		g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pGridDSVertexBuffer, &stride, &offset);
-		g_pImmediateContext->IASetIndexBuffer(g_pGridDSIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+		g_pImmediateContext->IASetIndexBuffer(g_pGridDSIndexBuffer, DXGI_FORMAT_R32_UINT, 0);
 	}
 	else if (faultFormation == true)
 	{
 		g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pGridFFVertexBuffer, &stride, &offset);
-		g_pImmediateContext->IASetIndexBuffer(g_pGridFFIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+		g_pImmediateContext->IASetIndexBuffer(g_pGridFFIndexBuffer, DXGI_FORMAT_R32_UINT, 0);
 	}
 	else if (perlinNoise == true)
 	{
 		g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pGridPNVertexBuffer, &stride, &offset);
-		g_pImmediateContext->IASetIndexBuffer(g_pGridPNIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+		g_pImmediateContext->IASetIndexBuffer(g_pGridPNIndexBuffer, DXGI_FORMAT_R32_UINT, 0);
 	}
 	else
 	{
 		g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pGridVertexBuffer, &stride, &offset);
-		g_pImmediateContext->IASetIndexBuffer(g_pGridIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+		g_pImmediateContext->IASetIndexBuffer(g_pGridIndexBuffer, DXGI_FORMAT_R32_UINT, 0);
 	}
 
 	g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST);
