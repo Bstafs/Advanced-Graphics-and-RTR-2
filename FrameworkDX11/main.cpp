@@ -69,6 +69,7 @@ ID3D11HullShader* g_pHullShader = nullptr;
 ID3D11DomainShader* g_pDomainShader = nullptr;
 
 ID3D11Buffer* g_pConstantBuffer = nullptr;
+ID3D11Buffer* g_pMatBuffer = nullptr;
 
 ID3D11Buffer* g_pLightConstantBuffer = nullptr;
 
@@ -95,6 +96,9 @@ MaterialPropertiesConstantBuffer	m_material;
 // SMA
 ID3D11VertexShader* g_pSMAVertexShader;
 ID3D11PixelShader* g_pSMAPixelShader;
+
+//Model myModel("Model/source/mc.blend", g_pd3dDevice);
+Model* myModel;
 
 // Camera
 XMMATRIX                g_View;
@@ -141,9 +145,13 @@ ID3D11ShaderResourceView* g_pTextureStone = nullptr;
 ID3D11ShaderResourceView* g_pTextureSnow = nullptr;
 ID3D11ShaderResourceView* g_pDispacementMap = nullptr;
 ID3D11ShaderResourceView* g_pHeightMap = nullptr;
+ID3D11ShaderResourceView* g_pmcTex = nullptr;
 
 XMFLOAT3 terrainPos = XMFLOAT3(0.0f, -5.0f, 0.0f);
 XMFLOAT3 terrainRot = XMFLOAT3(0.0f, 0.0f, 0.0f);
+
+XMFLOAT3 characterPos = XMFLOAT3(0.0f, -30.0f, 50.0f);
+XMFLOAT3 characterRot = XMFLOAT3(-1.5f, 3.0f, 0.0f);
 
 int terrainID;
 float terrainHeight = 4.0f;
@@ -200,24 +208,26 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 			Update();
 			KeyboardInput();
 
-			switch (terrainOrSMA)
-			{
-			case 0:
-			{
-				RenderTerrain();
-				break;
-			}
-			case 1:
-			{
-				RenderSMA();
-				break;
-			}
-			default:
-			{
-				RenderTerrain();
-				break;
-			}
-			}
+			//switch (terrainOrSMA)
+			//{
+			//case 0:
+			//{
+			//	RenderTerrain();
+			//	break;
+			//}
+			//case 1:
+			//{
+			//	RenderSMA();
+			//	break;
+			//}
+			//default:
+			//{
+			//	RenderTerrain();
+			//	break;
+			//}
+			//}
+
+			RenderSMA();
 		}
 	}
 
@@ -519,10 +529,20 @@ HRESULT InitDevice()
 	if (FAILED(hr))
 		return hr;
 
+	// Create the material constant buffer
+	bd.Usage = D3D11_USAGE_DEFAULT;
+	bd.ByteWidth = sizeof(MaterialPropertiesConstantBuffer);
+	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	bd.CPUAccessFlags = 0;
+	hr = g_pd3dDevice->CreateBuffer(&bd, nullptr, &g_pMatBuffer);
+	if (FAILED(hr))
+		return hr;
+
 	hr = CreateDDSTextureFromFile(g_pd3dDevice, L"grass.dds", nullptr, &g_pTextureGrass);
 	hr = CreateDDSTextureFromFile(g_pd3dDevice, L"stone.dds", nullptr, &g_pTextureStone);
 	hr = CreateDDSTextureFromFile(g_pd3dDevice, L"snow.dds", nullptr, &g_pTextureSnow);
 	hr = CreateDDSTextureFromFile(g_pd3dDevice, L"HeightMap.dds", nullptr, &g_pDispacementMap);
+	hr = CreateDDSTextureFromFile(g_pd3dDevice, L"mcTex.dds", nullptr, &g_pmcTex);
 
 
 	hr = InitMeshTerrain();
@@ -726,10 +746,8 @@ HRESULT		InitWorld(int width, int height)
 	CreateTerrainFaultFormation();
 	CreateTerrainPerlinNoise();
 
-	Skeleton* mySkeleton;
 
-
-
+	myModel = new Model("Model/source/mc.blend", g_pd3dDevice);
 
 	return S_OK;
 }
@@ -1502,6 +1520,11 @@ void Update()
 	object = (XMMatrixRotationX(terrainRot.x) * XMMatrixRotationY(terrainRot.y) * XMMatrixRotationZ(terrainRot.z)) * XMMatrixTranslation(terrainPos.x, terrainPos.y, terrainPos.z);
 
 	XMStoreFloat4x4(&g_Terrian, object);
+
+	XMMATRIX object2;
+	object2 = (XMMatrixRotationX(characterRot.x) * XMMatrixRotationY(characterRot.y) * XMMatrixRotationZ(characterRot.z)) * XMMatrixTranslation(characterPos.x, characterPos.y, characterPos.z);
+
+	XMStoreFloat4x4(&g_Character, object2);
 }
 
 void KeyboardInput()
@@ -1690,9 +1713,8 @@ void ImGuiRender()
 			terrainOrSMA = 1;
 		}
 
-		ImGui::DragFloat("ObjectPos", &g_GameObject.m_position.x);
-		ImGui::DragFloat("ObjectPos", &g_GameObject.m_position.y);
-		ImGui::DragFloat("ObjectPos", &g_GameObject.m_position.z);
+		ImGui::DragFloat3("Character Position", &characterPos.x);
+		ImGui::DragFloat3("Character Rotation", &characterRot.x, 0.01f);
 	}
 
 	ImGui::End();
@@ -1820,19 +1842,11 @@ void RenderSMA()
 	if (t == 0.0f)
 		return;
 
-	// Clear the back buffer
 	g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, Colors::MidnightBlue);
-
-	// Clear the depth buffer to 1.0 (max depth)
 	g_pImmediateContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
-	// Update the cube transform, material etc. 
-	g_GameObject.update(t, g_pImmediateContext);
+	XMMATRIX mGO = XMLoadFloat4x4(&g_Character);
 
-	// get the game object world transform
-	XMMATRIX mGO = XMLoadFloat4x4(g_GameObject.getTransform());
-
-	// store this and the view / projection in a constant buffer for the vertex shader to use
 	ConstantBuffer cb1;
 	cb1.mWorld = XMMatrixTranspose(mGO);
 	cb1.mView = XMMatrixTranspose(XMLoadFloat4x4(g_pCurrentCamera->GetView()));
@@ -1842,21 +1856,27 @@ void RenderSMA()
 
 	setupLightForRender();
 
-	// Render the cube
+	MaterialPropertiesConstantBuffer m_material;
+	m_material.Material.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	m_material.Material.Specular = XMFLOAT4(1.0f, 0.2f, 0.2f, 1.0f);
+	m_material.Material.SpecularPower = 32.0f;
+	m_material.Material.UseTexture = true;
+	g_pImmediateContext->UpdateSubresource(g_pMatBuffer, 0, nullptr, &m_material, 0, 0);
+
 	g_pImmediateContext->VSSetShader(g_pSMAVertexShader, nullptr, 0);
 	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pConstantBuffer);
 
 	g_pImmediateContext->PSSetShader(g_pSMAPixelShader, nullptr, 0);
 	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pConstantBuffer);
+	g_pImmediateContext->PSSetConstantBuffers(1, 1, &g_pMatBuffer);
 	g_pImmediateContext->PSSetConstantBuffers(2, 1, &g_pLightConstantBuffer);
-	ID3D11Buffer* materialCB = g_GameObject.getMaterialConstantBuffer();
-	g_pImmediateContext->PSSetConstantBuffers(1, 1, &materialCB);
 
-	g_GameObject.draw(g_pImmediateContext);
+	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pmcTex);
+
+	myModel->Draw(g_pImmediateContext);
 
 	ImGuiRender();
 
-	// Present our back buffer to our front buffer
 	g_pSwapChain->Present(0, 0);
 }
 

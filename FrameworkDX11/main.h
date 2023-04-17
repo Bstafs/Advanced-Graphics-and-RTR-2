@@ -29,9 +29,11 @@
 
 #include "Terrain.h"
 
-#include "Skeleton.h"
+#include "Model.h"
 
 #include "stb_image.h"
+
+#include <filesystem>
 
 #include <noise/noise.h>
 #include  "noiseutils.h"

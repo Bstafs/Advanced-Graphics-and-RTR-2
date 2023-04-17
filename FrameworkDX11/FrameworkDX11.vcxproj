@@ -365,10 +365,11 @@
     <ClInclude Include="ImGui\imstb_textedit.h" />
     <ClInclude Include="ImGui\imstb_truetype.h" />
     <ClInclude Include="main.h" />
+    <ClInclude Include="Mesh.h" />
+    <ClInclude Include="Model.h" />
     <ClInclude Include="noiseutils.h" />
     <ClInclude Include="Quaternion.h" />
     <CLInclude Include="resource.h" />
-    <ClInclude Include="Skeleton.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="structures.h" />
     <ClInclude Include="Terrain.h" />
@@ -386,8 +387,9 @@
     <ClCompile Include="ImGui\imgui_tables.cpp" />
     <ClCompile Include="ImGui\imgui_widgets.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="Model.cpp" />
     <ClCompile Include="noiseutils.cpp" />
-    <ClCompile Include="Skeleton.cpp" />
     <ClCompile Include="Terrain.cpp" />
   </ItemGroup>
   <ItemGroup>
