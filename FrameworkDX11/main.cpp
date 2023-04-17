@@ -152,6 +152,7 @@ XMFLOAT3 terrainRot = XMFLOAT3(0.0f, 0.0f, 0.0f);
 
 XMFLOAT3 characterPos = XMFLOAT3(0.0f, -30.0f, 50.0f);
 XMFLOAT3 characterRot = XMFLOAT3(-1.5f, 3.0f, 0.0f);
+XMFLOAT3 characterScal = XMFLOAT3(0.1f, 0.1f, 0.1f);
 
 int terrainID;
 float terrainHeight = 4.0f;
@@ -747,7 +748,7 @@ HRESULT		InitWorld(int width, int height)
 	CreateTerrainPerlinNoise();
 
 
-	myModel = new Model("Model/source/mc.blend", g_pd3dDevice);
+	myModel = new Model("Model/source/mc.fbx", g_pd3dDevice);
 
 	return S_OK;
 }
@@ -785,6 +786,9 @@ void CleanupDevice()
 	if (g_pHullShader) g_pHullShader->Release();
 	if (g_pDomainShader) g_pDomainShader->Release();
 	if (g_pWireFrame) g_pWireFrame->Release();
+
+	myModel = nullptr;
+	delete myModel;
 
 	ID3D11Debug* debugDevice = nullptr;
 	g_pd3dDevice->QueryInterface(__uuidof(ID3D11Debug), reinterpret_cast<void**>(&debugDevice));
@@ -1522,7 +1526,7 @@ void Update()
 	XMStoreFloat4x4(&g_Terrian, object);
 
 	XMMATRIX object2;
-	object2 = (XMMatrixRotationX(characterRot.x) * XMMatrixRotationY(characterRot.y) * XMMatrixRotationZ(characterRot.z)) * XMMatrixTranslation(characterPos.x, characterPos.y, characterPos.z);
+	object2 = (XMMatrixRotationX(characterRot.x) * XMMatrixRotationY(characterRot.y) * XMMatrixRotationZ(characterRot.z)) * XMMatrixScaling(characterScal.x, characterScal.y, characterScal.z) * XMMatrixTranslation(characterPos.x, characterPos.y, characterPos.z);
 
 	XMStoreFloat4x4(&g_Character, object2);
 }

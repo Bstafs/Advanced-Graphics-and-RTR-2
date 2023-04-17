@@ -43,8 +43,8 @@ using namespace noise;
 
 typedef vector<DrawableGameObject*> vecDrawables;
 
-const int terrainSizeHeight = 513; 
-const int terrainSizeWidth = 513;
+const int terrainSizeHeight = 257; 
+const int terrainSizeWidth = 257;
 
 int roughness = 5;
 

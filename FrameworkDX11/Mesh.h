@@ -9,11 +9,16 @@
 using namespace DirectX;
 using namespace std;
 
+#define MAX_BONE_INFLUENCE 4
+
 struct Vertex
 {
 	XMFLOAT3 Position;
 	XMFLOAT3 Normals;
 	XMFLOAT2 texCoords;
+
+	int BoneIDs[MAX_BONE_INFLUENCE];
+	float BoneWeights[MAX_BONE_INFLUENCE];
 };
 
 struct Texture
@@ -30,6 +35,7 @@ public:
 	vector<Texture> textures;
 
 	Mesh(vector<Vertex> vertices, vector<unsigned int> indices, vector<Texture> Textures, ID3D11Device* pd3dDevice);
+	~Mesh();
 	void Draw(ID3D11DeviceContext* deviceContext);
 
 private:

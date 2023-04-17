@@ -9,6 +9,11 @@ Mesh::Mesh(vector<Vertex> vertices, vector<unsigned> indices, vector<Texture> Te
 	SetupMesh(pd3dDevice);
 }
 
+Mesh::~Mesh()
+{
+	
+}
+
 void Mesh::SetupMesh(ID3D11Device* pd3dDevice)
 {
 	// Vertex Buffer

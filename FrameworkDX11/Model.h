@@ -6,6 +6,14 @@
 
 #include "Mesh.h"
 
+#include <map>
+
+struct BoneInfo
+{
+	int boneID;
+	XMFLOAT4X4 offset;
+};
+
 class Model
 {
 public:
@@ -13,14 +21,27 @@ public:
 	{
 		LoadModel(path, pd3dDevice);
 	}
+	~Model();
 
 	void Draw(ID3D11DeviceContext* deviceContext);
 private:
 	void LoadModel(string path, ID3D11Device* pd3dDevice);
 	void ProcessNode(aiNode* node, const aiScene* scene, ID3D11Device* pd3dDevice);
 	Mesh ProcessMesh(aiMesh* mesh, const aiScene* scene, ID3D11Device* pd3dDevice);
-	//vector<Texture> LoadMaterialTextures(aiMaterial* material, aiTextureType type, string typeName);
 
+	// Bone Extraction
+	std::map<std::string, BoneInfo> boneInfoMap;
+	int boneCounter = 0;
+
+	std::map<std::string, BoneInfo>& GetBoneInfoMap() { return boneInfoMap; }
+	int& GetBoneCount() { return boneCounter; }
+
+	XMFLOAT4X4 ConvertMatrixToDirectXFormat(aiMatrix4x4 from);
+	void SetVertexBoneDataToDefault(Vertex& vertex);
+	void SetVertexBoneData(Vertex& vertex, int boneID, float weight);
+	void ExtractBoneWeightForVertices(vector<Vertex>& vertices, aiMesh* mesh, const aiScene* scene);
+
+	// Model Import
 	const aiScene* pScene;
 	Assimp::Importer Importer;
 
