@@ -59,7 +59,7 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const aiScene* scene, ID3D11Device* pd3dDe
 
 		SetVertexBoneDataToDefault(vertex);
 
-		XMFLOAT3 vert;
+		XMFLOAT4 vert;
 		vert.x = mesh->mVertices[i].x;
 		vert.y = mesh->mVertices[i].y;
 		vert.z = mesh->mVertices[i].z;
@@ -116,23 +116,23 @@ XMFLOAT4X4 Model::ConvertMatrixToDirectXFormat(aiMatrix4x4 from)
 	XMFLOAT4X4 myMatrixFloat;
 
 	myMatrixFloat.m[0][0] = from.a1;
-	myMatrixFloat.m[0][1] = from.a2;
-	myMatrixFloat.m[0][2] = from.a3;
-	myMatrixFloat.m[0][3] = from.a4;
+	myMatrixFloat.m[1][0] = from.a2;
+	myMatrixFloat.m[2][0] = from.a3;
+	myMatrixFloat.m[3][0] = from.a4;
 
-	myMatrixFloat.m[1][0] = from.b1;
+	myMatrixFloat.m[0][1] = from.b1;
 	myMatrixFloat.m[1][1] = from.b2;
-	myMatrixFloat.m[1][2] = from.b3;
-	myMatrixFloat.m[1][3] = from.b4;
+	myMatrixFloat.m[2][1] = from.b3;
+	myMatrixFloat.m[3][1] = from.b4;
 
-	myMatrixFloat.m[2][0] = from.c1;
-	myMatrixFloat.m[2][1] = from.c2;
+	myMatrixFloat.m[0][2] = from.c1;
+	myMatrixFloat.m[1][2] = from.c2;
 	myMatrixFloat.m[2][2] = from.c3;
-	myMatrixFloat.m[2][3] = from.c4;
+	myMatrixFloat.m[3][2] = from.c4;
 
-	myMatrixFloat.m[3][0] = from.d1;
-	myMatrixFloat.m[3][1] = from.d2;
-	myMatrixFloat.m[3][2] = from.d3;
+	myMatrixFloat.m[0][3] = from.d1;
+	myMatrixFloat.m[1][3] = from.d2;
+	myMatrixFloat.m[2][3] = from.d3;
 	myMatrixFloat.m[3][3] = from.d4;
 
 	return myMatrixFloat;
@@ -150,7 +150,6 @@ void Model::ExtractBoneWeightForVertices(vector<Vertex>& vertices, aiMesh* mesh,
 		{
 			BoneInfo newBoneInfo;
 			newBoneInfo.boneID = boneCounter;
-			//newBoneInfo.offset = ConvertMatrixToDirectXFormat(mesh->mBones[boneIndex]->mOffsetMatrix);
 			newBoneInfo.offset = ConvertMatrixToDirectXFormat(mesh->mBones[boneIndex]->mOffsetMatrix);
 			boneInfoMap[boneName] = newBoneInfo;
 			boneID = boneCounter;

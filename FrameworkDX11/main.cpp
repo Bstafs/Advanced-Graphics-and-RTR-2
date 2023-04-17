@@ -63,6 +63,7 @@ ID3D11VertexShader* g_pVertexShader = nullptr;
 ID3D11PixelShader* g_pPixelShader = nullptr;
 
 ID3D11InputLayout* g_pVertexLayout = nullptr;
+ID3D11InputLayout* g_pVertexLayoutBones = nullptr;
 
 ID3D11HullShader* g_pHullShader = nullptr;
 
@@ -76,6 +77,7 @@ ID3D11Buffer* g_pLightConstantBuffer = nullptr;
 ID3D11RasterizerState* g_pWireFrame;
 ID3D11SamplerState* g_pSamplerState = nullptr;
 
+ID3D11Buffer* g_pAnimationBuffer = nullptr;
 
 // Terrain
 ID3D11Buffer* g_pGridVertexBuffer = nullptr;
@@ -99,6 +101,8 @@ ID3D11PixelShader* g_pSMAPixelShader;
 
 //Model myModel("Model/source/mc.blend", g_pd3dDevice);
 Model* myModel;
+Animator* myAnimator;
+Animation* myAnimation;
 
 // Camera
 XMMATRIX                g_View;
@@ -150,8 +154,8 @@ ID3D11ShaderResourceView* g_pmcTex = nullptr;
 XMFLOAT3 terrainPos = XMFLOAT3(0.0f, -5.0f, 0.0f);
 XMFLOAT3 terrainRot = XMFLOAT3(0.0f, 0.0f, 0.0f);
 
-XMFLOAT3 characterPos = XMFLOAT3(0.0f, -30.0f, 50.0f);
-XMFLOAT3 characterRot = XMFLOAT3(-1.5f, 3.0f, 0.0f);
+XMFLOAT3 characterPos = XMFLOAT3(-4.0f, -10.0f, 15.0f);
+XMFLOAT3 characterRot = XMFLOAT3(0.0f, 3.0f, 0.0f);
 XMFLOAT3 characterScal = XMFLOAT3(0.1f, 0.1f, 0.1f);
 
 int terrainID;
@@ -593,6 +597,22 @@ HRESULT		InitMeshTerrain()
 		return hr;
 	}
 
+	// Define the input layout
+	D3D11_INPUT_ELEMENT_DESC layout[] =
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT , D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT , D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	};
+	UINT numElements = ARRAYSIZE(layout);
+
+	// Create the input layout
+	hr = g_pd3dDevice->CreateInputLayout(layout, numElements, pVSBlob->GetBufferPointer(),
+		pVSBlob->GetBufferSize(), &g_pVertexLayout);
+	pVSBlob->Release();
+	if (FAILED(hr))
+		return hr;
+
 	// Compile the vertex shader
 	pVSBlob = nullptr;
 	hr = CompileShaderFromFile(L"shaderSMA.fx", "VS", "vs_5_0", &pVSBlob);
@@ -611,24 +631,33 @@ HRESULT		InitMeshTerrain()
 		return hr;
 	}
 
+	// Set the input layout
+	//g_pImmediateContext->IASetInputLayout(g_pVertexLayout);
+
 	// Define the input layout
-	D3D11_INPUT_ELEMENT_DESC layout[] =
+	D3D11_INPUT_ELEMENT_DESC layout2[] =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT , D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT , D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BONEID", 0, DXGI_FORMAT_R32G32_SINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BONEID", 1, DXGI_FORMAT_R32G32_SINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BONEID", 2, DXGI_FORMAT_R32G32_SINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BONEID", 3, DXGI_FORMAT_R32G32_SINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "WEIGHT", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "WEIGHT", 1, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "WEIGHT", 2, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "WEIGHT", 3, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+
 	};
-	UINT numElements = ARRAYSIZE(layout);
+	UINT numElements2 = ARRAYSIZE(layout2);
 
 	// Create the input layout
-	hr = g_pd3dDevice->CreateInputLayout(layout, numElements, pVSBlob->GetBufferPointer(),
-		pVSBlob->GetBufferSize(), &g_pVertexLayout);
+	hr = g_pd3dDevice->CreateInputLayout(layout2, numElements2, pVSBlob->GetBufferPointer(),
+		pVSBlob->GetBufferSize(), &g_pVertexLayoutBones);
 	pVSBlob->Release();
 	if (FAILED(hr))
 		return hr;
-
-	// Set the input layout
-	g_pImmediateContext->IASetInputLayout(g_pVertexLayout);
 
 	// Compile the Hull Shader
 	ID3DBlob* pHSBlob = nullptr;
@@ -720,6 +749,16 @@ HRESULT		InitMeshTerrain()
 		return hr;
 
 
+	// Create the constant buffer
+	D3D11_BUFFER_DESC bd2 = {};
+	bd2.Usage = D3D11_USAGE_DEFAULT;
+	bd2.ByteWidth = sizeof(BoneConstantBuffer);
+	bd2.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	bd2.CPUAccessFlags = 0;
+	hr = g_pd3dDevice->CreateBuffer(&bd2, nullptr, &g_pAnimationBuffer);
+	if (FAILED(hr))
+		return hr;
+
 	return hr;
 }
 
@@ -748,7 +787,9 @@ HRESULT		InitWorld(int width, int height)
 	CreateTerrainPerlinNoise();
 
 
-	myModel = new Model("Model/source/mc.fbx", g_pd3dDevice);
+	myModel = new Model("Model/Capoeira.dae", g_pd3dDevice);
+	myAnimation = new Animation("Model/Capoeira.dae", myModel);
+	myAnimator = new Animator(myAnimation);
 
 	return S_OK;
 }
@@ -1849,6 +1890,8 @@ void RenderSMA()
 	g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, Colors::MidnightBlue);
 	g_pImmediateContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
+	g_pImmediateContext->IASetInputLayout(g_pVertexLayoutBones);
+
 	XMMATRIX mGO = XMLoadFloat4x4(&g_Character);
 
 	ConstantBuffer cb1;
@@ -1867,8 +1910,19 @@ void RenderSMA()
 	m_material.Material.UseTexture = true;
 	g_pImmediateContext->UpdateSubresource(g_pMatBuffer, 0, nullptr, &m_material, 0, 0);
 
+	myAnimator->UpdateAnimation(t);
+
+	BoneConstantBuffer bcb;
+	std::vector<XMFLOAT4X4> boneTransforms = myAnimator->GetFinalBoneMatrices();
+	for (int i = 0; i < boneTransforms.size(); ++i)
+	{
+		bcb.finalBonesMatrices[i] = XMLoadFloat4x4(&boneTransforms[i]);
+	}
+	g_pImmediateContext->UpdateSubresource(g_pAnimationBuffer, 0, nullptr, &bcb, 0, 0);
+
 	g_pImmediateContext->VSSetShader(g_pSMAVertexShader, nullptr, 0);
 	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pConstantBuffer);
+	g_pImmediateContext->VSSetConstantBuffers(1, 1, &g_pAnimationBuffer);
 
 	g_pImmediateContext->PSSetShader(g_pSMAPixelShader, nullptr, 0);
 	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pConstantBuffer);

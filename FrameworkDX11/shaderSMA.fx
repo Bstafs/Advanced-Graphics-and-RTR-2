@@ -17,6 +17,11 @@ cbuffer ConstantBuffer : register( b0 )
 	float4 vOutputColor;
 }
 
+cbuffer BoneConstantBuffer : register(b1)
+{
+	matrix finalBonesMatrices[100];
+}
+
 Texture2D txDiffuse : register(t0);
 SamplerState samLinear : register(s0);
 
@@ -78,9 +83,12 @@ cbuffer LightProperties : register(b2)
 //--------------------------------------------------------------------------------------
 struct VS_INPUT
 {
-    float4 Pos : POSITION;
-	float3 Norm : NORMAL;
-	float2 Tex : TEXCOORD0;
+    float4 Pos : POSITION; // 16
+	float3 Norm : NORMAL; // 12 // 28
+	float2 Tex : TEXCOORD0; // 36
+	int BoneID[4] : BONEID0; // 16 // 52
+	float Weights[4] : WEIGHT0; // 68
+
 };
 
 struct PS_INPUT
@@ -179,7 +187,26 @@ LightingResult ComputeLighting(float4 vertexPos, float3 N)
 PS_INPUT VS( VS_INPUT input )
 {
     PS_INPUT output = (PS_INPUT)0;
-    output.Pos = mul( input.Pos, World );
+
+	float4 totalPosition = 0.0f;
+	for(int i = 0; i < 4; i++)
+	{
+		if(input.BoneID[i] == -1)
+		{
+			continue;
+		}
+		if (input.BoneID[i] >= 52)
+		{
+			totalPosition = float4(input.Pos);
+			break;
+		}
+		float4 localPosition = mul(finalBonesMatrices[input.BoneID[i]], input.Pos);
+		totalPosition += localPosition * input.Weights[i];
+	}
+
+	output.Pos = totalPosition;
+
+    output.Pos = mul( output.Pos, World );
 	output.worldPos = output.Pos;
     output.Pos = mul( output.Pos, View );
     output.Pos = mul( output.Pos, Projection );
@@ -188,7 +215,9 @@ PS_INPUT VS( VS_INPUT input )
 	output.Norm = mul(float4(input.Norm, 0), World).xyz;
 
 	output.Tex = input.Tex;
-    
+
+
+
     return output;
 }
 

@@ -35,6 +35,9 @@
 
 #include <filesystem>
 
+#include "Animator.h"
+#include "Animation.h"
+
 #include <noise/noise.h>
 #include  "noiseutils.h"
 

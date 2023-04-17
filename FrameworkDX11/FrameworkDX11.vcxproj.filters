@@ -2,7 +2,9 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <FxCompile Include="shader.fx" />
-    <FxCompile Include="shaderSMA.fx" />
+    <FxCompile Include="shaderSMA.fx">
+      <Filter>SMA</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DDSTextureLoader.cpp" />
@@ -32,8 +34,21 @@
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Terrain.cpp" />
     <ClCompile Include="noiseutils.cpp" />
-    <ClCompile Include="Model.cpp" />
-    <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="Mesh.cpp">
+      <Filter>SMA</Filter>
+    </ClCompile>
+    <ClCompile Include="Model.cpp">
+      <Filter>SMA</Filter>
+    </ClCompile>
+    <ClCompile Include="Bone.cpp">
+      <Filter>SMA</Filter>
+    </ClCompile>
+    <ClCompile Include="Animation.cpp">
+      <Filter>SMA</Filter>
+    </ClCompile>
+    <ClCompile Include="Animator.cpp">
+      <Filter>SMA</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DDSTextureLoader.h" />
@@ -70,8 +85,21 @@
     <ClInclude Include="noiseutils.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="Quaternion.h" />
-    <ClInclude Include="Model.h" />
-    <ClInclude Include="Mesh.h" />
+    <ClInclude Include="Mesh.h">
+      <Filter>SMA</Filter>
+    </ClInclude>
+    <ClInclude Include="Model.h">
+      <Filter>SMA</Filter>
+    </ClInclude>
+    <ClInclude Include="Bone.h">
+      <Filter>SMA</Filter>
+    </ClInclude>
+    <ClInclude Include="Animation.h">
+      <Filter>SMA</Filter>
+    </ClInclude>
+    <ClInclude Include="Animator.h">
+      <Filter>SMA</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Tutorial01.rc" />
@@ -83,6 +111,9 @@
   <ItemGroup>
     <Filter Include="imgui">
       <UniqueIdentifier>{3dcec7d1-a244-4745-ae39-e623782d94cd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SMA">
+      <UniqueIdentifier>{f958f1de-ced1-4e8c-a05a-6ad916edf53d}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

@@ -20,6 +20,11 @@ struct ConstantBuffer
 	float padding01;
 };
 
+struct BoneConstantBuffer
+{
+	XMMATRIX finalBonesMatrices[100];
+};
+
 struct SimpleVertex
 {
 	XMFLOAT3 Pos;

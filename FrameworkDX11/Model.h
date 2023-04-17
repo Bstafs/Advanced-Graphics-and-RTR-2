@@ -24,7 +24,7 @@ public:
 	~Model();
 
 	void Draw(ID3D11DeviceContext* deviceContext);
-private:
+
 	void LoadModel(string path, ID3D11Device* pd3dDevice);
 	void ProcessNode(aiNode* node, const aiScene* scene, ID3D11Device* pd3dDevice);
 	Mesh ProcessMesh(aiMesh* mesh, const aiScene* scene, ID3D11Device* pd3dDevice);
