@@ -54,7 +54,7 @@ void Animation::ReadMissingBones(const aiAnimation* animation, Model* model)
 
 XMFLOAT4X4 Animation::ConvertMatrixToDirectXFormat(aiMatrix4x4 from)
 {
-	XMFLOAT4X4 myMatrixFloat;
+	XMFLOAT4X4 myMatrixFloat = XMFLOAT4X4();
 
 	myMatrixFloat.m[0][0] = from.a1;
 	myMatrixFloat.m[1][0] = from.a2;
@@ -79,7 +79,7 @@ XMFLOAT4X4 Animation::ConvertMatrixToDirectXFormat(aiMatrix4x4 from)
 	return myMatrixFloat;
 }
 
-void Animation::ReadHeirarchyData(AssimpNodeData& dest, const aiNode* src)
+void Animation::ReadHeirarchyData(AssimpNodeData& dest, aiNode* src)
 {
 	assert(src);
 

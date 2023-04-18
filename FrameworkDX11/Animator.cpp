@@ -5,10 +5,15 @@ Animator::Animator(Animation* Animation)
     m_CurrentTime = 0.0;
     m_CurrentAnimation = Animation;
 
-    m_FinalBoneMatrices.reserve(52);
+    m_FinalBoneMatrices.reserve(100);
 
-    for (int i = 0; i < 52; i++)
-        m_FinalBoneMatrices.push_back(XMFLOAT4X4());
+    for (int i = 0; i < 100; i++)
+        m_FinalBoneMatrices.push_back(XMFLOAT4X4(
+		1,0,0,0,
+		0,1,0,0,
+		0,0,1,0,
+		0,0,0,1
+			));
 }
 
 void Animator::UpdateAnimation(float dt)
@@ -27,7 +32,6 @@ void Animator::PlayAnimation(Animation* pAnimation)
 	m_CurrentAnimation = pAnimation;
 	m_CurrentTime = 0.0f;
 }
-
 
 void Animator::CalculateBoneTransform(const AssimpNodeData* node, XMMATRIX parentTransform)
 {
@@ -53,5 +57,7 @@ void Animator::CalculateBoneTransform(const AssimpNodeData* node, XMMATRIX paren
 	}
 
 	for (int i = 0; i < node->childrenCount; i++)
+	{
 		CalculateBoneTransform(&node->children[i], globalTransformation);
+	}
 }

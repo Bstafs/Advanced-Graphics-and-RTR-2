@@ -102,7 +102,13 @@ ID3D11PixelShader* g_pSMAPixelShader;
 //Model myModel("Model/source/mc.blend", g_pd3dDevice);
 Model* myModel;
 Animator* myAnimator;
-Animation* myAnimation;
+
+Animation* IdleAnim = nullptr;
+Animation* WalkAnim = nullptr;
+Animation* RunningAnim = nullptr;
+Animation* DanceAnim = nullptr;
+Animation* JumpAnim = nullptr;
+Animation* StyleAnim = nullptr;
 
 // Camera
 XMMATRIX                g_View;
@@ -154,8 +160,9 @@ ID3D11ShaderResourceView* g_pmcTex = nullptr;
 XMFLOAT3 terrainPos = XMFLOAT3(0.0f, -5.0f, 0.0f);
 XMFLOAT3 terrainRot = XMFLOAT3(0.0f, 0.0f, 0.0f);
 
-XMFLOAT3 characterPos = XMFLOAT3(-4.0f, -10.0f, 15.0f);
-XMFLOAT3 characterRot = XMFLOAT3(0.0f, 3.0f, 0.0f);
+XMFLOAT3 characterPos = XMFLOAT3(0.0f, -3.0f, 4.5f);
+XMFLOAT3 characterRot = XMFLOAT3(0.0f, 3.2f, 0.0f);
+//XMFLOAT3 characterScal = XMFLOAT3(0.1f, 0.1f, 0.1f);
 XMFLOAT3 characterScal = XMFLOAT3(0.1f, 0.1f, 0.1f);
 
 int terrainID;
@@ -213,26 +220,24 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 			Update();
 			KeyboardInput();
 
-			//switch (terrainOrSMA)
-			//{
-			//case 0:
-			//{
-			//	RenderTerrain();
-			//	break;
-			//}
-			//case 1:
-			//{
-			//	RenderSMA();
-			//	break;
-			//}
-			//default:
-			//{
-			//	RenderTerrain();
-			//	break;
-			//}
-			//}
-
-			RenderSMA();
+			switch (terrainOrSMA)
+			{
+			case 0:
+			{
+				RenderTerrain();
+				break;
+			}
+			case 1:
+			{
+				RenderSMA();
+				break;
+			}
+			default:
+			{
+				RenderTerrain();
+				break;
+			}
+			}
 		}
 	}
 
@@ -615,7 +620,7 @@ HRESULT		InitMeshTerrain()
 
 	// Compile the vertex shader
 	pVSBlob = nullptr;
-	hr = CompileShaderFromFile(L"shaderSMA.fx", "VS", "vs_5_0", &pVSBlob);
+	hr = CompileShaderFromFile(L"shaderSMA.fx", "VS", "vs_4_0", &pVSBlob);
 	if (FAILED(hr))
 	{
 		MessageBox(nullptr,
@@ -640,14 +645,14 @@ HRESULT		InitMeshTerrain()
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT , D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT , D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "BONEID", 0, DXGI_FORMAT_R32G32_SINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "BONEID", 1, DXGI_FORMAT_R32G32_SINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "BONEID", 2, DXGI_FORMAT_R32G32_SINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "BONEID", 3, DXGI_FORMAT_R32G32_SINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "WEIGHT", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "WEIGHT", 1, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "WEIGHT", 2, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "WEIGHT", 3, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+		{ "BONEID", 0, DXGI_FORMAT_R32_SINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BONEID", 1, DXGI_FORMAT_R32_SINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BONEID", 2, DXGI_FORMAT_R32_SINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BONEID", 3, DXGI_FORMAT_R32_SINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "WEIGHT", 0, DXGI_FORMAT_R32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "WEIGHT", 1, DXGI_FORMAT_R32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "WEIGHT", 2, DXGI_FORMAT_R32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "WEIGHT", 3, DXGI_FORMAT_R32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 
 	};
 	UINT numElements2 = ARRAYSIZE(layout2);
@@ -673,13 +678,13 @@ HRESULT		InitMeshTerrain()
 	hr = g_pd3dDevice->CreateHullShader(pHSBlob->GetBufferPointer(), pHSBlob->GetBufferSize(), nullptr, &g_pHullShader);
 	if (FAILED(hr))
 	{
-		pVSBlob->Release();
+		pHSBlob->Release();
 		return hr;
 	}
 
 	// Compile the Domain Shader
 	ID3DBlob* pDSBlob = nullptr;
-	hr = CompileShaderFromFile(L"shader.fx", "DSMAIN", "ds_5_0", &pHSBlob);
+	hr = CompileShaderFromFile(L"shader.fx", "DSMAIN", "ds_5_0", &pDSBlob);
 	if (FAILED(hr))
 	{
 		MessageBox(nullptr,
@@ -688,10 +693,10 @@ HRESULT		InitMeshTerrain()
 	}
 
 	// Create the domain shader
-	hr = g_pd3dDevice->CreateDomainShader(pHSBlob->GetBufferPointer(), pHSBlob->GetBufferSize(), nullptr, &g_pDomainShader);
+	hr = g_pd3dDevice->CreateDomainShader(pDSBlob->GetBufferPointer(), pDSBlob->GetBufferSize(), nullptr, &g_pDomainShader);
 	if (FAILED(hr))
 	{
-		pVSBlob->Release();
+		pDSBlob->Release();
 		return hr;
 	}
 
@@ -786,10 +791,18 @@ HRESULT		InitWorld(int width, int height)
 	CreateTerrainFaultFormation();
 	CreateTerrainPerlinNoise();
 
+	// Model Loading
+	myModel = new Model("Model/Idle.dae", g_pd3dDevice);
 
-	myModel = new Model("Model/Capoeira.dae", g_pd3dDevice);
-	myAnimation = new Animation("Model/Capoeira.dae", myModel);
-	myAnimator = new Animator(myAnimation);
+	// Animation Loading
+	IdleAnim = new Animation("Model/Idle.dae", myModel);
+	WalkAnim = new Animation("Model/Walking.dae", myModel);
+	RunningAnim = new Animation("Model/Running.dae", myModel);
+	DanceAnim = new Animation("Model/Flair60.dae", myModel);
+	JumpAnim = new Animation("Model/Jump.dae", myModel);
+	JumpAnim = new Animation("Model/Style.dae", myModel);
+
+	myAnimator = new Animator(IdleAnim);
 
 	return S_OK;
 }
@@ -814,6 +827,7 @@ void CleanupDevice()
 	if (g_pLightConstantBuffer)
 		g_pLightConstantBuffer->Release();
 	if (g_pVertexLayout) g_pVertexLayout->Release();
+	if (g_pVertexLayoutBones) g_pVertexLayoutBones->Release();
 	if (g_pConstantBuffer) g_pConstantBuffer->Release();
 	if (g_pVertexShader) g_pVertexShader->Release();
 	if (g_pPixelShader) g_pPixelShader->Release();
@@ -1758,8 +1772,34 @@ void ImGuiRender()
 			terrainOrSMA = 1;
 		}
 
-		ImGui::DragFloat3("Character Position", &characterPos.x);
+		ImGui::DragFloat3("Character Position", &characterPos.x, 0.01f);
 		ImGui::DragFloat3("Character Rotation", &characterRot.x, 0.01f);
+
+		ImGui::Text("Animations");
+		if (ImGui::Button("Idle"))
+		{
+			myAnimator->PlayAnimation(IdleAnim);
+		}
+		else if (ImGui::Button("Walk"))
+		{
+			myAnimator->PlayAnimation(WalkAnim);
+		}
+		else if (ImGui::Button("Running"))
+		{
+			myAnimator->PlayAnimation(RunningAnim);
+		}
+		else if (ImGui::Button("Dance"))
+		{
+			myAnimator->PlayAnimation(DanceAnim);
+		}
+		else if (ImGui::Button("Jump"))
+		{
+			myAnimator->PlayAnimation(JumpAnim);
+		}
+		else if (ImGui::Button("Gangnam Style"))
+		{
+			myAnimator->PlayAnimation(StyleAnim);
+		}
 	}
 
 	ImGui::End();
@@ -1798,6 +1838,8 @@ void RenderTerrain()
 	g_pImmediateContext->UpdateSubresource(g_pTerrainMaterialBuffer, 0, nullptr, &m_material, 0, 0);
 
 	setupLightForRender();
+
+	g_pImmediateContext->IASetInputLayout(g_pVertexLayout);
 
 	if (diamondSquare == true)
 	{
@@ -1890,8 +1932,6 @@ void RenderSMA()
 	g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, Colors::MidnightBlue);
 	g_pImmediateContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
-	g_pImmediateContext->IASetInputLayout(g_pVertexLayoutBones);
-
 	XMMATRIX mGO = XMLoadFloat4x4(&g_Character);
 
 	ConstantBuffer cb1;
@@ -1912,7 +1952,9 @@ void RenderSMA()
 
 	myAnimator->UpdateAnimation(t);
 
-	BoneConstantBuffer bcb;
+	g_pImmediateContext->IASetInputLayout(g_pVertexLayoutBones);
+
+	BoneConstantBuffer bcb = {};
 	std::vector<XMFLOAT4X4> boneTransforms = myAnimator->GetFinalBoneMatrices();
 	for (int i = 0; i < boneTransforms.size(); ++i)
 	{
@@ -1922,7 +1964,7 @@ void RenderSMA()
 
 	g_pImmediateContext->VSSetShader(g_pSMAVertexShader, nullptr, 0);
 	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pConstantBuffer);
-	g_pImmediateContext->VSSetConstantBuffers(1, 1, &g_pAnimationBuffer);
+	g_pImmediateContext->VSSetConstantBuffers(4, 1, &g_pAnimationBuffer);
 
 	g_pImmediateContext->PSSetShader(g_pSMAPixelShader, nullptr, 0);
 	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pConstantBuffer);

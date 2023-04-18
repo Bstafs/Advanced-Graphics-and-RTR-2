@@ -13,14 +13,12 @@ using namespace std;
 
 struct Vertex
 {
-	XMFLOAT4 Position;
+	XMFLOAT3 Position;
 	XMFLOAT3 Normals;
 	XMFLOAT2 texCoords;
 
-	int BoneIDs[MAX_BONE_INFLUENCE]; // 
-	float BoneWeights[MAX_BONE_INFLUENCE];
-
-	// 64
+	int BoneIDs[4]; 
+	float BoneWeights[4];
 };
 
 struct Texture

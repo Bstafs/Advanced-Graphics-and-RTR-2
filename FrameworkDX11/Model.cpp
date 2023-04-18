@@ -59,7 +59,7 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const aiScene* scene, ID3D11Device* pd3dDe
 
 		SetVertexBoneDataToDefault(vertex);
 
-		XMFLOAT4 vert;
+		XMFLOAT3 vert;
 		vert.x = mesh->mVertices[i].x;
 		vert.y = mesh->mVertices[i].y;
 		vert.z = mesh->mVertices[i].z;
@@ -113,7 +113,7 @@ void Model::SetVertexBoneData(Vertex& vertex, int boneID, float weight)
 
 XMFLOAT4X4 Model::ConvertMatrixToDirectXFormat(aiMatrix4x4 from)
 {
-	XMFLOAT4X4 myMatrixFloat;
+	XMFLOAT4X4 myMatrixFloat = XMFLOAT4X4();
 
 	myMatrixFloat.m[0][0] = from.a1;
 	myMatrixFloat.m[1][0] = from.a2;

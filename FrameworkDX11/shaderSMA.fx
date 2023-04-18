@@ -17,7 +17,7 @@ cbuffer ConstantBuffer : register( b0 )
 	float4 vOutputColor;
 }
 
-cbuffer BoneConstantBuffer : register(b1)
+cbuffer BoneConstantBuffer : register(b4)
 {
 	matrix finalBonesMatrices[100];
 }
@@ -188,14 +188,15 @@ PS_INPUT VS( VS_INPUT input )
 {
     PS_INPUT output = (PS_INPUT)0;
 
-	float4 totalPosition = 0.0f;
+	float4 totalPosition = float4(0.0f, 0.0f, 0.0f, 0.0f);
+
 	for(int i = 0; i < 4; i++)
 	{
 		if(input.BoneID[i] == -1)
 		{
 			continue;
 		}
-		if (input.BoneID[i] >= 52)
+		if (input.BoneID[i] >= 100)
 		{
 			totalPosition = float4(input.Pos);
 			break;

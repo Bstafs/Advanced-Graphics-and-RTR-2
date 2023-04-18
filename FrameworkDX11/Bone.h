@@ -5,19 +5,19 @@
 
 struct KeyPosition
 {
-	XMVECTOR Position;
+	XMFLOAT3 Position;
 	float timeStamp;
 };
 
 struct KeyRotation
 {
-	XMVECTOR orientation;
+	XMFLOAT4 orientation;
 	float timeStamp;
 };
 
 struct KeyScale
 {
-	XMVECTOR scale;
+	XMFLOAT3 scale;
 	float timeStamp;
 };
 
@@ -26,9 +26,9 @@ class Bone
 public:
 	Bone(const std::string& name, int ID, const aiNodeAnim* channel);
 
-	XMMATRIX InterpolatePosition(float animationTime);
-	XMMATRIX InterpolateRotation(float animationTime);
-	XMMATRIX InterpolateScaling(float animationTime);
+	XMVECTOR InterpolatePosition(float animationTime);
+	XMVECTOR InterpolateRotation(float animationTime);
+	XMVECTOR InterpolateScaling(float animationTime);
 
 	XMFLOAT4X4* GetLocalTransform() { return &m_LocalTransform; }
 	std::string GetBoneName() const { return m_name; }
