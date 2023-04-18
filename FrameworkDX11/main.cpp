@@ -1794,13 +1794,13 @@ void ImGuiRender()
 		{
 			myAnimator->PlayAnimation(RunningAnim);
 		}
-		else if (ImGui::Button("Dance"))
-		{
-			myAnimator->PlayAnimation(DanceAnim);
-		}
 		else if (ImGui::Button("Jump"))
 		{
 			myAnimator->PlayAnimation(JumpAnim);
+		}
+		else if (ImGui::Button("Flair"))
+		{
+			myAnimator->PlayAnimation(DanceAnim);
 		}
 		else if (ImGui::Button("Gangnam Style"))
 		{
