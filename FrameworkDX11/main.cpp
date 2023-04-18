@@ -785,6 +785,7 @@ HRESULT		InitWorld(int width, int height)
 	g_pCurrentCamera->SetView();
 	g_pCurrentCamera->SetProjection();
 	g_pCurrentCamera->SetProjectionView();
+	
 
 	CreateTerrainGridHM();
 	CreateTerrainDiamondSquare();
@@ -800,7 +801,7 @@ HRESULT		InitWorld(int width, int height)
 	RunningAnim = new Animation("Model/Running.dae", myModel);
 	DanceAnim = new Animation("Model/Flair60.dae", myModel);
 	JumpAnim = new Animation("Model/Jump.dae", myModel);
-	JumpAnim = new Animation("Model/Style.dae", myModel);
+	StyleAnim = new Animation("Model/Style.dae", myModel);
 
 	myAnimator = new Animator(IdleAnim);
 
@@ -1769,6 +1770,11 @@ void ImGuiRender()
 	{
 		if (ImGui::Button("Render SMA"))
 		{
+			currentPosX = 0.0f;
+			currentPosY = 0.0f;
+			currentPosZ = -1.0f;
+			rotationX = 0.0f;
+			rotationY = 0.0f;
 			terrainOrSMA = 1;
 		}
 
