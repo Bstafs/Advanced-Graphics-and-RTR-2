@@ -1838,6 +1838,9 @@ void RenderTerrain()
 	cb1.terrainID = terrainID;
 	cb1.terrainHeight = terrainHeight;
 	cb1.terrainBias = terrainBias;
+	cb1.viewPortDim = XMFLOAT2(g_viewWidth, g_viewHeight);
+	cb1.tessEdgeSize = 20.0f;
+	cb1.padding01 = XMFLOAT2(0.0f, 0.0f);
 	cb1.vOutputColor = XMFLOAT4(1, 1, 1, 0);
 
 	g_pImmediateContext->UpdateSubresource(g_pConstantBuffer, 0, nullptr, &cb1, 0, 0);
@@ -1878,6 +1881,7 @@ void RenderTerrain()
 
 	// Hull Shader Stage
 	g_pImmediateContext->HSSetShader(g_pHullShader, nullptr, 0);
+	g_pImmediateContext->HSSetConstantBuffers(0, 1, &g_pConstantBuffer);
 
 	// Tessellation (Hidden)
 

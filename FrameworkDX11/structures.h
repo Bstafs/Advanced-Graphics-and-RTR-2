@@ -17,7 +17,10 @@ struct ConstantBuffer
 	int terrainID;
 	float terrainHeight;
 	float terrainBias;
-	float padding01;
+	float tessEdgeSize;
+
+	XMFLOAT2 viewPortDim;
+	XMFLOAT2 padding01;
 };
 
 struct BoneConstantBuffer

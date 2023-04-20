@@ -9,18 +9,21 @@
 //--------------------------------------------------------------------------------------
 // Constant Buffer Variables
 //--------------------------------------------------------------------------------------
-cbuffer ConstantBuffer : register(b0)
+cbuffer ConstantBuffer : register (b0)
 {
-	matrix World;
-	matrix View;
-	matrix Projection;
-	float4 vOutputColor;
+    matrix World;
+    matrix View;
+    matrix Projection;
+    float4 vOutputColor;
 
-	int terrainID;
-	float terrainHeight;
-	float terrainBias;
-	float padding01;
-}
+    int terrainID;
+    float terrainHeight;
+    float terrainBias;
+    float tessEdgeSize;
+
+    float2 viewPortDim;
+    float2 padding01;
+};
 
 Texture2D txGrass : register(t0);
 Texture2D txStone : register(t1);
@@ -225,7 +228,7 @@ PS_INPUT VS(VS_INPUT input)
 [outputtopology("triangle_cw")]
 [outputcontrolpoints(3)]
 [patchconstantfunc("PassThroughConstantHS")]
-[maxtessfactor(64.0)]
+[maxtessfactor(10.0f)]
 HS_INPUT HSMAIN(InputPatch<HS_INPUT, 3> ip, uint i : SV_OutputControlPointID, uint PatchID : SV_PrimitiveID)
 {
 	HS_INPUT output;
@@ -238,14 +241,41 @@ HS_INPUT HSMAIN(InputPatch<HS_INPUT, 3> ip, uint i : SV_OutputControlPointID, ui
 //--------------------------------------------------------------------------------------
 // Hull Shader Patch Constant Phase
 //--------------------------------------------------------------------------------------
+
+float LOD(float4 p0, float4 p1)
+{
+    // Calculate edge mid point
+    float4 midPoint = 0.5f * (p0 + p1);
+    // Sphere radius between the control points
+    float radius = distance(p0, p1) / 2.0f;
+
+    // View space
+    float4 viewSpace = mul(transpose(View), midPoint);
+
+    // Project into clip space
+    float4 clip0 = mul(Projection, (viewSpace - float4(radius, float3(0.0f, 0.0f, 0.0f))));
+    float4 clip1 = mul(Projection, (viewSpace + float4(radius, float3(0.0f, 0.0f, 0.0f))));
+
+    // Get NDC
+    clip0 /= clip0.w;
+    clip1 /= clip1.w;
+
+    // Convert to screen space
+    clip0.xy *= viewPortDim.xy;
+    clip1.xy *= viewPortDim.xy;
+
+    return clamp(distance(clip0, clip1) / tessEdgeSize, 1.0f, 64.0f);
+}
+
+
 HS_CONSTANT_DATA_OUTPUT PassThroughConstantHS(InputPatch<HS_INPUT, 3> ip, uint PatchID : SV_PrimitiveID)
 {
 	float tessellationFactor = 8.0f;
 	HS_CONSTANT_DATA_OUTPUT output;
-	output.Edges[0] = tessellationFactor;
-	output.Edges[1] = tessellationFactor;
-	output.Edges[2] = tessellationFactor;
-	output.Inside = tessellationFactor;
+    output.Edges[0] = LOD(ip[2].Pos, ip[0].Pos);
+    output.Edges[1] = LOD(ip[0].Pos, ip[1].Pos);
+    output.Edges[2] = LOD(ip[1].Pos, ip[2].Pos);
+    output.Inside = lerp(output.Edges[0], output.Edges[2], 0.5f);
 	return output;
 }
 //--------------------------------------------------------------------------------------
@@ -272,7 +302,7 @@ PS_INPUT DSMAIN(HS_CONSTANT_DATA_OUTPUT input, float3 barycentrucCoords : SV_Dom
 	fDisplacement += terrainBias;
 
 
-	float3 vDirection = -output.Norm;
+	float3 vDirection = output.Norm;
 
 	if (terrainID == 1)
 	{
