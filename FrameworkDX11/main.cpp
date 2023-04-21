@@ -115,11 +115,13 @@ XMMATRIX                g_View;
 XMMATRIX                g_Projection;
 Camera* g_pCurrentCamera = nullptr;
 Camera* g_pCamera0 = nullptr;
+Camera* g_pCamera1 = nullptr;
 float currentPosZ = -2.0f;
 float currentPosX = 0.0f;
 float currentPosY = 0.0f;
 float rotationX = 0.0f;
 float rotationY = 0.0f;
+float g_pNearPlane = 0.01f;
 
 int						g_viewWidth;
 int						g_viewHeight;
@@ -781,6 +783,7 @@ HRESULT		InitWorld(int width, int height)
 	ImGui::StyleColorsClassic();
 
 	g_pCamera0 = new Camera(XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), g_viewWidth, g_viewHeight, 0.01f, 10000.0f);
+	g_pCamera1 = new Camera(XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), g_viewWidth, g_viewHeight, 1.0f, 10000.0f);
 	g_pCurrentCamera = g_pCamera0;
 	g_pCurrentCamera->SetView();
 	g_pCurrentCamera->SetProjection();
@@ -1711,6 +1714,7 @@ void ImGuiRender()
 	{
 		if (ImGui::Button("Render Terrain"))
 		{
+			g_pCurrentCamera = g_pCamera1;;
 			terrainOrSMA = 0;
 		}
 
@@ -1770,6 +1774,7 @@ void ImGuiRender()
 	{
 		if (ImGui::Button("Render SMA"))
 		{
+			g_pCurrentCamera = g_pCamera0;
 			currentPosX = 0.0f;
 			currentPosY = 0.0f;
 			currentPosZ = -1.0f;

@@ -54,6 +54,11 @@ void Camera::SetProjectionView()
 	XMStoreFloat4x4(&_projectionView, temp);
 }
 
+void Camera::SetNearPlane(float nearDepth)
+{
+	XMStoreFloat4x4(&_projection, XMMatrixPerspectiveFovLH(XM_PIDIV2, (FLOAT)_windowWidth / (FLOAT)_windowHeight, nearDepth, _farDepth));
+}
+
 
 
 void Camera::Reshape(FLOAT windowWidth, FLOAT windowHeight, FLOAT nearDepth, FLOAT farDepth)

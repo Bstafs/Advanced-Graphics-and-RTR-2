@@ -36,6 +36,8 @@ public:
 	XMFLOAT4X4* GetProjectionView() { return &_projectionView; }
 	void SetProjectionView();
 
+	void SetNearPlane(float nearDepth);
+
 
 
 	void Reshape(FLOAT windowWidth, FLOAT windowHeight, FLOAT nearDepth, FLOAT farDepth);

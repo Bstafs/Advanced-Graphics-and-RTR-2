@@ -228,7 +228,7 @@ PS_INPUT VS(VS_INPUT input)
 [outputtopology("triangle_cw")]
 [outputcontrolpoints(3)]
 [patchconstantfunc("PassThroughConstantHS")]
-[maxtessfactor(10.0f)]
+[maxtessfactor(5.0f)]
 HS_INPUT HSMAIN(InputPatch<HS_INPUT, 3> ip, uint i : SV_OutputControlPointID, uint PatchID : SV_PrimitiveID)
 {
 	HS_INPUT output;
