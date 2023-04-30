@@ -99,7 +99,6 @@ MaterialPropertiesConstantBuffer	m_material;
 ID3D11VertexShader* g_pSMAVertexShader;
 ID3D11PixelShader* g_pSMAPixelShader;
 
-//Model myModel("Model/source/mc.blend", g_pd3dDevice);
 Model* myModel;
 Animator* myAnimator;
 
@@ -108,7 +107,15 @@ Animation* WalkAnim = nullptr;
 Animation* RunningAnim = nullptr;
 Animation* DanceAnim = nullptr;
 Animation* JumpAnim = nullptr;
+Animation* RollAnim = nullptr;
 Animation* StyleAnim = nullptr;
+
+bool blendIdleWalk = false;
+bool blendWalkRun = false;
+bool blendRunJump = false;
+bool blendRunningRoll = false;
+
+float blendFactor = 0.0f;
 
 // Camera
 XMMATRIX                g_View;
@@ -788,7 +795,7 @@ HRESULT		InitWorld(int width, int height)
 	g_pCurrentCamera->SetView();
 	g_pCurrentCamera->SetProjection();
 	g_pCurrentCamera->SetProjectionView();
-	
+
 
 	CreateTerrainGridHM();
 	CreateTerrainDiamondSquare();
@@ -805,6 +812,7 @@ HRESULT		InitWorld(int width, int height)
 	DanceAnim = new Animation("Model/Flair60.dae", myModel);
 	JumpAnim = new Animation("Model/Jump.dae", myModel);
 	StyleAnim = new Animation("Model/Style.dae", myModel);
+	RollAnim = new Animation("Model/Roll.dae", myModel);
 
 	myAnimator = new Animator(IdleAnim);
 
@@ -1803,6 +1811,10 @@ void ImGuiRender()
 		{
 			myAnimator->PlayAnimation(JumpAnim);
 		}
+		else if (ImGui::Button("Roll"))
+		{
+			myAnimator->PlayAnimation(RollAnim);
+		}
 		else if (ImGui::Button("Flair"))
 		{
 			myAnimator->PlayAnimation(DanceAnim);
@@ -1810,6 +1822,26 @@ void ImGuiRender()
 		else if (ImGui::Button("Gangnam Style"))
 		{
 			myAnimator->PlayAnimation(StyleAnim);
+		}
+
+		ImGui::Text("Animations Blended");
+		ImGui::DragFloat("Blend Factor:", &blendFactor, 0.002f, 0.0f, 1.0f);
+
+		if(ImGui::Checkbox("Idle --> Walk", &blendIdleWalk))
+		{
+			blendFactor = 0.0f;
+		}
+		else if (ImGui::Checkbox("Walk --> Run", &blendWalkRun))
+		{
+			blendFactor = 0.0f;
+		}
+		else if (ImGui::Checkbox("Run --> Jump", &blendRunJump))
+		{
+			blendFactor = 0.0f;
+		}
+		else if (ImGui::Checkbox("Run --> Roll", &blendRunningRoll))
+		{
+			blendFactor = 0.0f;
 		}
 	}
 
@@ -1965,7 +1997,27 @@ void RenderSMA()
 	m_material.Material.UseTexture = true;
 	g_pImmediateContext->UpdateSubresource(g_pMatBuffer, 0, nullptr, &m_material, 0, 0);
 
-	myAnimator->UpdateAnimation(t);
+	if (blendIdleWalk == true)
+	{
+		myAnimator->BlendAnimation(IdleAnim, WalkAnim, blendFactor, t);
+	}
+	else if (blendWalkRun == true)
+	{
+		myAnimator->BlendAnimation(WalkAnim, RunningAnim, blendFactor, t);
+	}
+	else if (blendRunJump == true)
+	{
+		myAnimator->BlendAnimation(RunningAnim, JumpAnim, blendFactor, t);
+	}
+	else if (blendRunningRoll == true)
+	{
+		myAnimator->BlendAnimation(RunningAnim, RollAnim, blendFactor, t);
+	}
+	else
+	{
+		myAnimator->UpdateAnimation(t);
+	}
+
 
 	g_pImmediateContext->IASetInputLayout(g_pVertexLayoutBones);
 
