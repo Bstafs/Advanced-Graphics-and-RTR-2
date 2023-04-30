@@ -2011,7 +2011,7 @@ void RenderSMA()
 	}
 	else if (blendRunningRoll == true)
 	{
-		myAnimator->BlendAnimation(RunningAnim, RollAnim, blendFactor, t);
+		myAnimator->BlendAnimation(RunningAnim, DanceAnim, blendFactor, t);
 	}
 	else
 	{
