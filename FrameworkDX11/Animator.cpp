@@ -107,18 +107,16 @@ void Animator::CalculateBlendedBoneTransform(Animation* pAnimationBase, const As
 		layeredNodeTransform = XMLoadFloat4x4(Bone->GetLocalTransform());
 	}
 
-	// Blending Rotation / Matrices between Animations
+	// Blending Matrices
 	XMVECTOR rot0 = XMQuaternionRotationMatrix(nodeTransform);
 	XMVECTOR rot1 = XMQuaternionRotationMatrix(layeredNodeTransform);
 	XMVECTOR finalRot = XMQuaternionNormalize(XMQuaternionSlerp(rot0, rot1, blendFactor));
-
 	XMMATRIX blendedMat = XMMatrixRotationQuaternion(finalRot);
 
-	XMVECTOR blendedTranslation = XMVectorLerp(nodeTransform.r[3], layeredNodeTransform.r[3], blendFactor);
-	XMFLOAT4 blendedTranslationFloat4 = XMFLOAT4();
-
-	XMStoreFloat4(&blendedTranslationFloat4, blendedTranslation);
-	blendedMat.r[3] = XMLoadFloat4(&blendedTranslationFloat4);
+	blendedMat.r[3] = (1.0f - blendFactor) * nodeTransform.r[3] + layeredNodeTransform.r[3] * blendFactor;
+	blendedMat.r[2] = (1.0f - blendFactor) * nodeTransform.r[2] + layeredNodeTransform.r[2] * blendFactor;
+	blendedMat.r[1] = (1.0f - blendFactor) * nodeTransform.r[1] + layeredNodeTransform.r[1] * blendFactor;
+	blendedMat.r[0] = (1.0f - blendFactor) * nodeTransform.r[0] + layeredNodeTransform.r[0] * blendFactor;
 
 	XMMATRIX globalTransformation = blendedMat * parentTransform;
 
