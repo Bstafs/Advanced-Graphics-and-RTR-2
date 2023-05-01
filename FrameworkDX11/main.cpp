@@ -16,10 +16,6 @@
 
 #include "main.h"
 
-bool isLooping = true; 
-const float MAX_BLEND_FACTOR = 1.0f;
-const float MIN_BLEND_FACTOR = 0.0f;
-
 DirectX::XMFLOAT4 g_EyePosition(0.0f, 0, -3, 1.0f);
 XMFLOAT4 LightPosition(g_EyePosition);
 //--------------------------------------------------------------------------------------
@@ -118,7 +114,10 @@ bool blendIdleWalk = false;
 bool blendWalkRun = false;
 bool blendRunJump = false;
 
-bool blendFactorUpdating = false;
+bool blendFactorUpdating = true;
+bool isLooping = true;
+const float MAX_BLEND_FACTOR = 1.0f;
+const float MIN_BLEND_FACTOR = 0.0f;
 
 float blendFactor = 0.0f;
 
@@ -1704,7 +1703,7 @@ void ImGuiRender()
 	ImGui::NewFrame();
 	ImGui::Begin("Debug Window");
 
-	ImGui::SetWindowSize(ImVec2(500.0f, 500.0f));
+	ImGui::SetWindowSize(ImVec2(500.0f, 525.0f));
 
 	if (ImGui::CollapsingHeader("Camera"))
 	{
@@ -1838,14 +1837,20 @@ void ImGuiRender()
 		if(ImGui::Checkbox("Idle --> Walk", &blendIdleWalk))
 		{
 			blendFactor = 0.0f;
+			blendWalkRun = false;
+			blendRunJump = false;
 		}
 		else if (ImGui::Checkbox("Walk --> Run", &blendWalkRun))
 		{
 			blendFactor = 0.0f;
+			blendIdleWalk = false;
+			blendRunJump = false;
 		}
-		else if (ImGui::Checkbox("Run --> Jump", &blendRunJump))
+		else if (ImGui::Checkbox("Run  --> Jump", &blendRunJump))
 		{
 			blendFactor = 0.0f;
+			blendIdleWalk = false;
+			blendWalkRun = false;
 		}
 	}
 
