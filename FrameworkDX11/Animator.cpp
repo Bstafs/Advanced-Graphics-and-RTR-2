@@ -118,6 +118,7 @@ void Animator::CalculateBlendedBoneTransform(Animation* pAnimationBase, const As
 	blendedMat.r[1] = (1.0f - blendFactor) * nodeTransform.r[1] + layeredNodeTransform.r[1] * blendFactor;
 	blendedMat.r[0] = (1.0f - blendFactor) * nodeTransform.r[0] + layeredNodeTransform.r[0] * blendFactor;
 
+
 	XMMATRIX globalTransformation = blendedMat * parentTransform;
 
 	auto boneInfoMap = pAnimationBase->GetBoneIDMap();

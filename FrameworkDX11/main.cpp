@@ -16,6 +16,10 @@
 
 #include "main.h"
 
+bool isLooping = true; 
+const float MAX_BLEND_FACTOR = 1.0f;
+const float MIN_BLEND_FACTOR = 0.0f;
+
 DirectX::XMFLOAT4 g_EyePosition(0.0f, 0, -3, 1.0f);
 XMFLOAT4 LightPosition(g_EyePosition);
 //--------------------------------------------------------------------------------------
@@ -1997,14 +2001,10 @@ void RenderSMA()
 	m_material.Material.UseTexture = true;
 	g_pImmediateContext->UpdateSubresource(g_pMatBuffer, 0, nullptr, &m_material, 0, 0);
 
-	if (blendFactorUpdating == true)
+	if (blendFactorUpdating)
 	{
-		blendFactor += 0.004f;
-
-		if (blendFactor > 1.0f)
-		{
-			blendFactor = 0.0f;
-		}
+		blendFactor += (isLooping ? 0.004f : -0.004f);
+		isLooping = blendFactor >= MAX_BLEND_FACTOR ? false : blendFactor <= MIN_BLEND_FACTOR ? true : isLooping;
 	}
 
 	if (blendIdleWalk == true)
