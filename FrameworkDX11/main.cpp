@@ -113,7 +113,8 @@ Animation* StyleAnim = nullptr;
 bool blendIdleWalk = false;
 bool blendWalkRun = false;
 bool blendRunJump = false;
-bool blendRunningRoll = false;
+
+bool blendFactorUpdating = false;
 
 float blendFactor = 0.0f;
 
@@ -1253,11 +1254,10 @@ HRESULT CreateTerrainFaultFormation()
 		float pX = (pColumn * dx) + (-dx * 0.5);
 		float pY = v[pRow * columns + pColumn].Pos.y;
 
-		int randomAngle = rand() + 359 + 0; // 360 radians
+		int randomAngle = rand() + 359 + 0;
 		XMFLOAT3 randomNormalVector(cos(randomAngle), 0, sin(randomAngle));
 		XMVECTOR normalVector = XMLoadFloat3(&randomNormalVector);
 
-		// Value we are going to change the terrain by in this run
 		float faultDistribution = rand() % roughness + -roughness;
 
 		for (UINT j = 0; j < rows; ++j)
@@ -1268,9 +1268,10 @@ HRESULT CreateTerrainFaultFormation()
 				float x = k * dx + -dx * 0.5;
 
 				float currentY = v[j * columns + k].Pos.y;
+
 				// Y is added/subtracted based on its current height value and dot product
-				XMFLOAT3 b = XMFLOAT3(x - pX, currentY - pY, z - pZ);
-				XMVECTOR vecPB = XMLoadFloat3(&b);
+				XMFLOAT3 base = XMFLOAT3(x - pX, currentY - pY, z - pZ);
+				XMVECTOR vecPB = XMLoadFloat3(&base);
 
 				// Check if position of current vertex - random selected vertex is more than 90
 				// If it is then its in the region we want to increase
@@ -1828,6 +1829,7 @@ void ImGuiRender()
 
 		ImGui::Text("Animations Blended");
 		ImGui::DragFloat("Blend Factor:", &blendFactor, 0.002f, 0.0f, 1.0f);
+		ImGui::Checkbox("Update Blend Factor", &blendFactorUpdating);
 
 		if(ImGui::Checkbox("Idle --> Walk", &blendIdleWalk))
 		{
@@ -1838,10 +1840,6 @@ void ImGuiRender()
 			blendFactor = 0.0f;
 		}
 		else if (ImGui::Checkbox("Run --> Jump", &blendRunJump))
-		{
-			blendFactor = 0.0f;
-		}
-		else if (ImGui::Checkbox("Run --> Roll", &blendRunningRoll))
 		{
 			blendFactor = 0.0f;
 		}
@@ -1999,6 +1997,16 @@ void RenderSMA()
 	m_material.Material.UseTexture = true;
 	g_pImmediateContext->UpdateSubresource(g_pMatBuffer, 0, nullptr, &m_material, 0, 0);
 
+	if (blendFactorUpdating == true)
+	{
+		blendFactor += 0.004f;
+
+		if (blendFactor > 1.0f)
+		{
+			blendFactor = 0.0f;
+		}
+	}
+
 	if (blendIdleWalk == true)
 	{
 		myAnimator->BlendAnimation(IdleAnim, WalkAnim, blendFactor, t);
@@ -2010,10 +2018,6 @@ void RenderSMA()
 	else if (blendRunJump == true)
 	{
 		myAnimator->BlendAnimation(RunningAnim, JumpAnim, blendFactor, t);
-	}
-	else if (blendRunningRoll == true)
-	{
-		myAnimator->BlendAnimation(RunningAnim, DanceAnim, blendFactor, t);
 	}
 	else
 	{
