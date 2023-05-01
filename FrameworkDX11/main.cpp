@@ -184,13 +184,7 @@ bool perlinNoise = false;
 int randomSeed = 100;
 
 // Fault Formation
-int faultIterations = 10;
-
-// Controls the vertical displacement for the fault lines - higher means more variation 
-float faultAmplitude = 1.0f;
-
-// Width of the fault lines
-float faultWidth = 1.0f;
+int faultIterations = 1;
 
 int imGUIRoughness = 15;
 
@@ -1250,48 +1244,58 @@ HRESULT CreateTerrainFaultFormation()
 
 	std::vector<SimpleVertex> v(totalVertices);
 
-	// Vertex Generation
-	for (UINT i = 0; i < rows; ++i)
+	for (int i = 0; i < faultIterations; ++i)
 	{
-		float z = halfDepth - i * dz;
-		for (UINT j = 0; j < columns; ++j)
+		int pRow = rand() % rows;
+		int pColumn = rand() % columns;
+
+		float pZ = halfDepth - (pRow * dz);
+		float pX = (pColumn * dx) + (-dx * 0.5);
+		float pY = v[pRow * columns + pColumn].Pos.y;
+
+		int randomAngle = rand() + 359 + 0; // 360 radians
+		XMFLOAT3 randomNormalVector(cos(randomAngle), 0, sin(randomAngle));
+		XMVECTOR normalVector = XMLoadFloat3(&randomNormalVector);
+
+		// Value we are going to change the terrain by in this run
+		float faultDistribution = rand() % roughness + -roughness;
+
+		for (UINT j = 0; j < rows; ++j)
 		{
-			float x = j * dx + -dx * 0.5;
-
-			float y = 0.0f;
-
-			// Fault Line Algorithm Starts Here
-			for (int iter = 0; iter < faultIterations; ++iter)
+			float z = halfDepth - j * dz;
+			for (UINT k = 0; k < columns; ++k)
 			{
-				// Calculate The Random Points on the grid Created
-				float xLine1 = terrainSizeWidth * 0.1f + rand() % terrainSizeWidth * 0.8f;
-				float yLine1 = (rand() % 2 == 0) ? terrainSizeHeight - 1 : 0;
+				float x = k * dx + -dx * 0.5;
 
-				float xLine2 = xLine1 + (rand() % roughness + -roughness);
-				float yLine2 = yLine1 + (rand() % roughness + -roughness);
+				float currentY = v[j * columns + k].Pos.y;
+				// Y is added/subtracted based on its current height value and dot product
+				XMFLOAT3 b = XMFLOAT3(x - pX, currentY - pY, z - pZ);
+				XMVECTOR vecPB = XMLoadFloat3(&b);
 
-				// Using y = mx + b to get the slope intersect between (Also known as creating the line between these two points)
-				float slope = (yLine2 - yLine1) / (xLine2 - xLine1); // The slope (m)
-				float yIntercept = yLine1 - (slope * xLine1); // The Y Intercept (b)
+				// Check if position of current vertex - random selected vertex is more than 90
+				// If it is then its in the region we want to increase
+				// If not then we decrease
+				XMFLOAT3 comparison;
+				XMStoreFloat3(&comparison, XMVector3Dot(vecPB, normalVector));
+				float newY = currentY;
+				if (comparison.x >= 0 && comparison.z >= 0)
+				{
+					newY += faultDistribution;
+				}
+				else
+				{
+					newY -= faultDistribution;
+				}
 
-				//Calculate a distances from the current vertex on the grid to the fault line being created.
-				float distance = (j - xLine1) * (yLine2 - yLine1) - (i * dz - yLine1) * (xLine2 - xLine1);
+				v[j * columns + k].Pos = XMFLOAT3(x, newY, z);
+				v[j * columns + k].Normal = XMFLOAT3(0.0f, 1.0f, 0.0f);
 
-				// Calculating Height Based on Distance
-				float finalFaultHeight = faultAmplitude * max(0.0f, 1.0f - abs(distance) / faultWidth);
-
-				y += finalFaultHeight * (j > i * slope * yIntercept ? 1.0f : -1.0f);
-
+				v[j * columns + k].TexCoord.x = k * dx;
+				v[j * columns + k].TexCoord.y = j * dz;
 			}
-			v[i * columns + j].Pos = XMFLOAT3(x, y, z);
-			v[i * columns + j].Normal = XMFLOAT3(0.0f, 1.0f, 0.0f);
-
-			v[i * columns + j].TexCoord.x = j * du;
-			v[i * columns + j].TexCoord.y = i * dv;
 
 		}
 	}
-
 	std::vector<DWORD> indices(totalFaces * 3);
 
 	int k = 0;
@@ -1759,8 +1763,6 @@ void ImGuiRender()
 			}
 			ImGui::Checkbox("Fault Formation Algorithm", &faultFormation);
 			ImGui::DragInt("Fault Iterations", &faultIterations);
-			ImGui::DragFloat("Fault Width", &faultWidth);
-			ImGui::DragFloat("Fault Amplitude", &faultAmplitude);
 			if (ImGui::Button("Generate Fault Formation") && faultFormation == true && diamondSquare == false && perlinNoise == false)
 			{
 				randomSeed = rand() % 2147483647 + 0;
