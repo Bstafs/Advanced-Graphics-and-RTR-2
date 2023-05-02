@@ -20,7 +20,8 @@ struct ConstantBuffer
 	float tessEdgeSize;
 
 	XMFLOAT2 viewPortDim;
-	XMFLOAT2 padding01;
+	int isLOD;
+	float tessFactor;
 };
 
 struct BoneConstantBuffer

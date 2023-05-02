@@ -11,18 +11,19 @@
 //--------------------------------------------------------------------------------------
 cbuffer ConstantBuffer : register (b0)
 {
-    matrix World;
-    matrix View;
-    matrix Projection;
-    float4 vOutputColor;
+	matrix World;
+	matrix View;
+	matrix Projection;
+	float4 vOutputColor;
 
-    int terrainID;
-    float terrainHeight;
-    float terrainBias;
-    float tessEdgeSize;
+	int terrainID;
+	float terrainHeight;
+	float terrainBias;
+	float tessEdgeSize;
 
-    float2 viewPortDim;
-    float2 padding01;
+	float2 viewPortDim;
+	int isLOD;
+	float tessFactor;
 };
 
 Texture2D txGrass : register(t0);
@@ -228,7 +229,7 @@ PS_INPUT VS(VS_INPUT input)
 [outputtopology("triangle_cw")]
 [outputcontrolpoints(3)]
 [patchconstantfunc("PassThroughConstantHS")]
-[maxtessfactor(5.0f)]
+[maxtessfactor(20.0f)]
 HS_INPUT HSMAIN(InputPatch<HS_INPUT, 3> ip, uint i : SV_OutputControlPointID, uint PatchID : SV_PrimitiveID)
 {
 	HS_INPUT output;
@@ -244,38 +245,49 @@ HS_INPUT HSMAIN(InputPatch<HS_INPUT, 3> ip, uint i : SV_OutputControlPointID, ui
 
 float LOD(float4 p0, float4 p1)
 {
-    // Calculate edge mid point
-    float4 midPoint = 0.5f * (p0 + p1);
-    // Sphere radius between the control points
-    float radius = distance(p0, p1) / 2.0f;
+	// Calculate edge mid point
+	float4 midPoint = 0.5f * (p0 + p1);
+	// Sphere radius between the control points
+	float radius = distance(p0, p1) / 2.0f;
 
-    // View space
-    float4 viewSpace = mul(transpose(View), midPoint);
+	// View space
+	float4 viewSpace = mul(transpose(View), midPoint);
 
-    // Project into clip space
-    float4 clip0 = mul(Projection, (viewSpace - float4(radius, float3(0.0f, 0.0f, 0.0f))));
-    float4 clip1 = mul(Projection, (viewSpace + float4(radius, float3(0.0f, 0.0f, 0.0f))));
+	// Project into clip space
+	float4 clip0 = mul(Projection, (viewSpace - float4(radius, float3(0.0f, 0.0f, 0.0f))));
+	float4 clip1 = mul(Projection, (viewSpace + float4(radius, float3(0.0f, 0.0f, 0.0f))));
 
-    // Get NDC
-    clip0 /= clip0.w;
-    clip1 /= clip1.w;
+	// Get NDC
+	clip0 /= clip0.w;
+	clip1 /= clip1.w;
 
-    // Convert to screen space
-    clip0.xy *= viewPortDim.xy;
-    clip1.xy *= viewPortDim.xy;
+	// Convert to screen space
+	clip0.xy *= viewPortDim.xy;
+	clip1.xy *= viewPortDim.xy;
 
-    return clamp(distance(clip0, clip1) / tessEdgeSize, 1.0f, 64.0f);
+	return clamp(distance(clip0, clip1) / tessEdgeSize, 1.0f, 64.0f);
 }
 
 
 HS_CONSTANT_DATA_OUTPUT PassThroughConstantHS(InputPatch<HS_INPUT, 3> ip, uint PatchID : SV_PrimitiveID)
 {
-	float tessellationFactor = 8.0f;
 	HS_CONSTANT_DATA_OUTPUT output;
-    output.Edges[0] = LOD(ip[2].Pos, ip[0].Pos);
-    output.Edges[1] = LOD(ip[0].Pos, ip[1].Pos);
-    output.Edges[2] = LOD(ip[1].Pos, ip[2].Pos);
-    output.Inside = lerp(output.Edges[0], output.Edges[2], 0.5f);
+
+	if (isLOD == 1)
+	{
+		output.Edges[0] = LOD(ip[2].Pos, ip[0].Pos);
+		output.Edges[1] = LOD(ip[0].Pos, ip[1].Pos);
+		output.Edges[2] = LOD(ip[1].Pos, ip[2].Pos);
+		output.Inside = lerp(output.Edges[0], output.Edges[2], 0.5f);
+	}
+	else if (isLOD == 0)
+	{
+		output.Edges[0] = tessFactor;
+		output.Edges[1] = tessFactor;
+		output.Edges[2] = tessFactor;
+		output.Inside = tessFactor;
+	}
+
 	return output;
 }
 //--------------------------------------------------------------------------------------
@@ -346,7 +358,7 @@ float4 PS(PS_INPUT IN) : SV_TARGET
 			// 0.0 - 0.3 = Grass
 		  texColor = grassColor;
 		}
-		else if(IN.terrainHeight < 0.5f)
+		else if (IN.terrainHeight < 0.5f)
 		{
 			// 0.3 - 0.5 = grass -> rock
 			texColor = lerp(grassColor, rockColor, (IN.terrainHeight - 0.3) / 0.2);
@@ -356,7 +368,7 @@ float4 PS(PS_INPUT IN) : SV_TARGET
 			// 0.5 - 0.7 = Rock
 			texColor = rockColor;
 		}
-		else if(IN.terrainHeight < 0.8f)
+		else if (IN.terrainHeight < 0.8f)
 		{
 			// 0.7 - 0.8 = Rock -> snow
 			texColor = lerp(rockColor, snowColor, (IN.terrainHeight - 0.7) / 0.1);

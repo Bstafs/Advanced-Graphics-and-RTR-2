@@ -138,6 +138,8 @@ int						g_viewWidth;
 int						g_viewHeight;
 
 bool isWireFrame = false;
+bool isLOD = false;
+float tessellationFactor = 8.0f;
 
 DrawableGameObject		g_GameObject;
 
@@ -1250,13 +1252,13 @@ HRESULT CreateTerrainFaultFormation()
 
 	for (int i = 0; i < faultIterations; ++i)
 	{
+		// grab a random row and column
 		int pRow = rand() % rows;
 		int pColumn = rand() % columns;
 
-		float pZ = halfDepth - (pRow * dz);
-		float pX = (pColumn * dx) + (-dx * 0.5);
-		float pY = v[pRow * columns + pColumn].Pos.y;
+		XMFLOAT3 randomPoint = XMFLOAT3((pColumn * dx) + (-dx * 0.5), v[pRow * columns + pColumn].Pos.y, halfDepth - (pRow * dz));
 
+		// finds a random angle to decide which side to raise
 		int randomAngle = rand() + 359 + 0;
 		XMFLOAT3 randomNormalVector(cos(randomAngle), 0, sin(randomAngle));
 		XMVECTOR normalVector = XMLoadFloat3(&randomNormalVector);
@@ -1273,7 +1275,7 @@ HRESULT CreateTerrainFaultFormation()
 				float currentY = v[j * columns + k].Pos.y;
 
 				// Y is added/subtracted based on its current height value and dot product
-				XMFLOAT3 base = XMFLOAT3(x - pX, currentY - pY, z - pZ);
+				XMFLOAT3 base = XMFLOAT3(x - randomPoint.x, currentY - randomPoint.y, z - randomPoint.z);
 				XMVECTOR vecPB = XMLoadFloat3(&base);
 
 				// Check if position of current vertex - random selected vertex is more than 90
@@ -1372,7 +1374,6 @@ HRESULT CreateTerrainPerlinNoise()
 
 	module::ScaleBias flatTerrain;
 	flatTerrain.SetSourceModule(0, baseFlatTerrain);
-	// Dont Touch
 	flatTerrain.SetScale(0.125);
 	flatTerrain.SetBias(-0.75);
 
@@ -1387,7 +1388,6 @@ HRESULT CreateTerrainPerlinNoise()
 	terrainSelector.SetBounds(0.0, 10000.0);
 	terrainSelector.SetEdgeFalloff(0.125);
 
-	// Dont touch for now
 	module::Turbulence finalTerrain;
 	finalTerrain.SetSourceModule(0, terrainSelector);
 	finalTerrain.SetFrequency(4.0);
@@ -1742,6 +1742,10 @@ void ImGuiRender()
 
 		ImGui::DragFloat("Terrain Bias", &terrainBias);
 
+		ImGui::DragFloat("Tessellation Factor", &tessellationFactor, 1.0f, 1.0f, 64.0f);
+
+		ImGui::Checkbox("Enable LOD", &isLOD);
+
 		if (ImGui::CollapsingHeader("Static Terrain"))
 		{
 			if (ImGui::Button("Grid"))
@@ -1846,12 +1850,6 @@ void ImGuiRender()
 			blendIdleWalk = false;
 			blendRunJump = false;
 		}
-		else if (ImGui::Checkbox("Run  --> Jump", &blendRunJump))
-		{
-			blendFactor = 0.0f;
-			blendIdleWalk = false;
-			blendWalkRun = false;
-		}
 	}
 
 	ImGui::End();
@@ -1886,7 +1884,8 @@ void RenderTerrain()
 	cb1.terrainBias = terrainBias;
 	cb1.viewPortDim = XMFLOAT2(g_viewWidth, g_viewHeight);
 	cb1.tessEdgeSize = 20.0f;
-	cb1.padding01 = XMFLOAT2(0.0f, 0.0f);
+	cb1.isLOD = isLOD;
+	cb1.tessFactor = tessellationFactor;
 	cb1.vOutputColor = XMFLOAT4(1, 1, 1, 0);
 
 	g_pImmediateContext->UpdateSubresource(g_pConstantBuffer, 0, nullptr, &cb1, 0, 0);
@@ -2019,10 +2018,6 @@ void RenderSMA()
 	else if (blendWalkRun == true)
 	{
 		myAnimator->BlendAnimation(WalkAnim, RunningAnim, blendFactor, t);
-	}
-	else if (blendRunJump == true)
-	{
-		myAnimator->BlendAnimation(RunningAnim, JumpAnim, blendFactor, t);
 	}
 	else
 	{

@@ -82,7 +82,9 @@ void Animator::BlendAnimation(Animation* pBaseAnimation, Animation* pLayeredAnim
 	currentTimeLayered += pLayeredAnimation->GetTicksPerSecond() * deltaTime * animSpeedMultiplierDown;
 	currentTimeLayered = fmod(currentTimeLayered, pLayeredAnimation->GetDuration());
 
-	CalculateBlendedBoneTransform(pBaseAnimation, &pBaseAnimation->GetRootNode(), pLayeredAnimation, &pLayeredAnimation->GetRootNode(), currentTimeBase, currentTimeLayered, XMMatrixIdentity(), blendFactor);
+	CalculateBlendedBoneTransform(pBaseAnimation, &pBaseAnimation->GetRootNode(),
+		pLayeredAnimation, &pLayeredAnimation->GetRootNode(),
+		currentTimeBase, currentTimeLayered, XMMatrixIdentity(), blendFactor);
 }
 
 void Animator::CalculateBlendedBoneTransform(Animation* pAnimationBase, const AssimpNodeData* node, Animation* pAnimationLayer, const AssimpNodeData* nodeLayered, const float currentBaseTime, const float currentTimeLayered, XMMATRIX parentTransform, const float blendFactor)
